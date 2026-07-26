@@ -1,20 +1,13 @@
 {
-  "name": "مدیریت سود کافه هناس",
+  "name": "مدیر سود و عملیات کافه هناس",
   "short_name": "هناس",
-  "description": "محاسبه بهای تمام‌شده، قیمت پیشنهادی، سود محصولات و تحلیل مالی کافه هناس",
-  "lang": "fa",
-  "dir": "rtl",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#171717",
-  "theme_color": "#151515",
-  "categories": [
-    "business",
-    "finance",
-    "productivity"
-  ],
+  "theme_color": "#111111",
+  "lang": "fa",
+  "dir": "rtl",
   "icons": [
     {
       "src": "icons/icon-192.png",
