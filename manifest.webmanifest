@@ -1,22 +1,22 @@
 {
-  "name": "مدیر سود و عملیات کافه هناس",
-  "short_name": "هناس",
+  "name": "Henas Profit Manager",
+  "short_name": "Henas",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#171717",
+  "background_color": "#111111",
   "theme_color": "#111111",
   "lang": "fa",
   "dir": "rtl",
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "./icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "./icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

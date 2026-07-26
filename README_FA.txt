@@ -1,9 +1,9 @@
-نسخه 2 PWA کافه هناس
+نسخه 3 PWA کافه هناس
 
-1- فایل ZIP را Extract کنید.
-2- تمام فایل‌های داخل آن را در ریشه Repository فعلی GitHub آپلود و جایگزین کنید.
-3- Commit changes را بزنید.
-4- چند دقیقه بعد GitHub Pages نسخه جدید را منتشر می‌کند.
-5- سایت را Refresh کنید. در اندروید Chrome از منوی سه‌نقطه Install app را بزنید.
-
-اطلاعات روی همان مرورگر ذخیره می‌شود؛ مرتب خروجی پشتیبان JSON بگیرید.
+برای جایگزینی نسخه GitHub:
+1. ZIP را Extract کنید.
+2. فایل‌های index.html، app.js، manifest.webmanifest، service-worker.js و پوشه icons را در ریشه Repository آپلود کنید.
+3. گزینه Commit changes را بزنید.
+4. دو دقیقه صبر کنید.
+5. سایت را با Ctrl+F5 بازخوانی کنید.
+6. اگر نسخه قدیمی ماند، Chrome > Site settings > Clear data و سپس سایت را دوباره باز کنید.

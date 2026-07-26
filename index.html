@@ -1,10 +1,113 @@
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/icon-192.png"><title>مدیر سود کافه هناس</title><style>
-:root{--bg:#171717;--p:#242424;--p2:#303030;--t:#eee;--m:#aaa;--l:#464646;--g:#779a6d;--r:#c96b6b;--o:#c89550}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font-family:Vazirmatn,Tahoma,Arial,sans-serif;padding-bottom:70px}header{position:sticky;top:0;z-index:9;background:#101010;padding:14px 16px;border-bottom:1px solid var(--l);display:flex;justify-content:space-between;align-items:center}h1{font-size:20px;margin:0}small{color:var(--m)}button,input,select{font:inherit}button{border:1px solid #555;background:#111;color:#eee;border-radius:11px;padding:9px 12px;cursor:pointer}main{max-width:1300px;margin:auto;padding:15px}.tabs{display:flex;gap:7px;overflow:auto;margin-bottom:14px}.tabs button.active{background:#444}.page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.card{background:var(--p);border:1px solid var(--l);border-radius:16px;padding:15px}.s3{grid-column:span 3}.s4{grid-column:span 4}.s6{grid-column:span 6}.s8{grid-column:span 8}.s12{grid-column:span 12}.kpi b{font-size:25px;display:block;margin-top:8px}.form{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}label{font-size:12px;color:#ccc;display:block;margin-bottom:5px}input,select{width:100%;padding:10px;background:#181818;color:#eee;border:1px solid #555;border-radius:10px}.act{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.good{background:#30402f}.bad{background:#4b2828}.warn{background:#4b3924}.table{overflow:auto;max-height:430px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;padding:9px;border-bottom:1px solid #444}th{background:#303030}.sug{background:#191919;border-right:4px solid #777;padding:12px;border-radius:10px;margin:8px 0;line-height:1.8}.sug.high{border-color:var(--r)}.sug.med{border-color:var(--o)}.sug.low{border-color:var(--g)}.green{color:#a8c79e}.red{color:#e28a8a}.badge{padding:3px 8px;border-radius:12px;background:#444}.modal{display:none;position:fixed;inset:0;background:#000c;z-index:20;align-items:center;justify-content:center;padding:16px}.modal.open{display:flex}.modal>div{background:#252525;border:1px solid #555;border-radius:15px;padding:16px;width:min(700px,100%);max-height:90vh;overflow:auto}.rr{display:grid;grid-template-columns:2fr 1fr auto;gap:7px;margin:7px 0}@media(max-width:800px){.s3,.s4,.s6,.s8{grid-column:span 12}.form{grid-template-columns:1fr 1fr}}@media(max-width:520px){.form{grid-template-columns:1fr}.tabs{position:fixed;bottom:0;left:0;right:0;background:#111;padding:7px;margin:0;z-index:10}.tabs button{flex:1;font-size:10px;padding:9px 4px}header small{display:none}}
-</style></head><body><header><div><h1>مدیر سود کافه هناس</h1><small>تصمیم‌یار مالی و عملیاتی</small></div><div><button id="install" hidden>نصب اپ</button><button onclick="backup()">پشتیبان</button><label style="display:inline"><button onclick="this.nextElementSibling.click()">بازیابی</button><input hidden type="file" accept=".json" onchange="restore(event)"></label></div></header><main><div class="tabs" id="tabs"></div>
-<section class="page active" id="dashboard"><div class="grid"><div class="card kpi s3">فروش ماه<b id="sales">۰</b></div><div class="card kpi s3">سود ناخالص<b id="gross">۰</b></div><div class="card kpi s3">سود خالص<b id="net">۰</b></div><div class="card kpi s3">حاشیه سود<b id="margin">۰٪</b></div><div class="card s8"><h2>پیشنهادهای هوشمند</h2><div id="suggestions"></div></div><div class="card s4"><h2>هدف سود</h2><label>سود هدف ماهانه</label><input id="target" type="number" onchange="settings()"><label>روز کاری</label><input id="days" type="number" onchange="settings()"><p>فاصله تا هدف: <b id="gap"></b></p><p>فروش اضافه روزانه: <b id="daily"></b></p></div></div></section>
-<section class="page" id="ingredients"><div class="card"><h2>مواد اولیه</h2><div class="form"><div><label>نام ماده</label><input id="in"></div><div><label>قیمت بسته</label><input id="ip" type="number"></div><div><label>مقدار بسته</label><input id="iq" type="number"></div><div><label>واحد</label><select id="iu"><option>گرم</option><option>میلی‌لیتر</option><option>عدد</option></select></div></div><div class="act"><button class="good" onclick="addIng()">ثبت ماده</button></div><div class="table"><table id="it"></table></div></div></section>
-<section class="page" id="products"><div class="card"><h2>محصولات و رسپی</h2><div class="form"><div><label>نام محصول</label><input id="pn"></div><div><label>قیمت فروش</label><input id="pp" type="number"></div><div><label>تعداد فروش ماه</label><input id="pq" type="number"></div><div><label>بسته‌بندی هر سرو</label><input id="pc" type="number" value="0"></div></div><div class="act"><button class="good" onclick="openRecipe()">تعریف رسپی و ثبت</button></div><div class="table"><table id="pt"></table></div></div></section>
-<section class="page" id="expenses"><div class="grid"><div class="card s6"><h2>هزینه‌ها</h2><div class="form" style="grid-template-columns:2fr 1fr 1fr"><div><label>عنوان</label><input id="en"></div><div><label>مبلغ</label><input id="ea" type="number"></div><div><label>نوع</label><select id="et"><option>ثابت</option><option>متغیر</option></select></div></div><div class="act"><button class="good" onclick="addExp()">ثبت</button></div><div class="table"><table id="ext"></table></div></div><div class="card s6"><h2>پرت</h2><div class="form" style="grid-template-columns:2fr 1fr"><div><label>ماده</label><select id="wi"></select></div><div><label>مقدار پرت</label><input id="wq" type="number"></div></div><div class="act"><button class="good" onclick="addWaste()">ثبت</button></div><div class="table"><table id="wt"></table></div></div></div></section>
-<section class="page" id="inventory"><div class="card"><h2>موجودی و پیشنهاد خرید</h2><div class="table"><table id="ivt"></table></div></div></section>
-<section class="page" id="analysis"><div class="grid"><div class="card s12"><h2>مهندسی منو</h2><div class="table"><table id="at"></table></div></div><div class="card s6"><h2>سود و زیان</h2><div id="pnl"></div></div><div class="card s6"><h2>سناریوی سود</h2><div id="scenario"></div></div></div></section></main>
-<div class="modal" id="modal"><div><h2>رسپی محصول</h2><div id="rows"></div><button onclick="addRow()">افزودن ماده</button><div class="form" style="margin-top:10px"><div><label>پرت رسپی %</label><input id="rw" type="number" value="3"></div><div><label>سربار هر سرو</label><input id="ro" type="number" value="0"></div><div><label>کارمزد %</label><input id="rf" type="number" value="0"></div><div><label>حاشیه سود هدف %</label><input id="rm" type="number" value="55"></div></div><div class="act"><button class="good" onclick="saveProd()">ذخیره</button><button onclick="modal.classList.remove('open')">انصراف</button></div></div></div><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<title>Henas Profit</title>
+<style>
+@font-face{font-family:Vazirmatn;src:local("Vazirmatn"),local("Vazir")}
+:root{--bg:#111;--surface:#1b1b1b;--surface2:#242424;--line:#383838;--text:#f1f1f1;--muted:#aaa;--green:#8aaa7c;--red:#d56d6d;--amber:#d2a45f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Vazirmatn,Tahoma,Arial,sans-serif;padding-bottom:72px}
+header{position:sticky;top:0;z-index:20;padding:16px;background:rgba(17,17,17,.97);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:12px;align-items:center}.logo{width:46px;height:46px;border:1px solid #555;border-radius:16px;display:grid;place-items:center;background:#050505;font-weight:900}.brand h1{margin:0;font-size:19px}.brand small{color:var(--muted)}
+button,input,select{font:inherit}.btn{background:#262626;border:1px solid #4a4a4a;color:#eee;padding:10px 13px;border-radius:12px}.btn.primary{background:#050505}.btn.danger{background:#492828}.btn.good{background:#2c402d}
+main{max-width:1200px;margin:auto;padding:14px}.tabs{display:flex;gap:8px;overflow:auto;margin-bottom:14px}.tab{white-space:nowrap;background:#1a1a1a;border:1px solid #3a3a3a;color:#bbb;border-radius:12px;padding:10px 13px}.tab.active{background:#050505;color:#fff}
+.page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.card{grid-column:span 12;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.kpi{grid-column:span 3}.half{grid-column:span 6}.kpi small{color:var(--muted)}.kpi strong{font-size:25px;display:block;margin-top:8px}.goodText{color:#b2d3a7}.badText{color:#e58a8a}.warnText{color:#e0b978}
+.form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}label{font-size:12px;color:#c7c7c7;display:block;margin-bottom:6px}input,select{width:100%;background:#131313;border:1px solid #4a4a4a;color:white;border-radius:12px;padding:11px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.table-wrap{overflow:auto;max-height:480px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #373737;text-align:right}th{background:#222;color:#ddd;position:sticky;top:0}.chip{display:inline-block;border-radius:999px;padding:4px 9px;font-size:11px;background:#303030}.chip.good{background:#29402c}.chip.bad{background:#482828}.chip.warn{background:#4d3c22}
+.insight{background:#141414;border-right:4px solid #777;padding:13px;border-radius:13px;margin:9px 0;line-height:1.8}.insight.high{border-color:var(--red)}.insight.medium{border-color:var(--amber)}.insight.low{border-color:var(--green)}
+.hero{background:linear-gradient(135deg,#232323,#151515);border:1px solid #444;border-radius:20px;padding:20px;margin-bottom:12px}.hero h2{margin:0 0 8px}.hero p{color:#bbb;margin:0;line-height:1.8}
+.bottom{display:none}
+@media(max-width:850px){.kpi{grid-column:span 6}.half{grid-column:span 12}.form{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){main{padding:10px}.tabs{display:none}.kpi{grid-column:span 6}.form{grid-template-columns:1fr}.bottom{display:flex;position:fixed;bottom:0;left:0;right:0;background:#0c0c0c;border-top:1px solid #444;z-index:30;overflow:auto}.bottom button{min-width:74px;flex:1;background:none;color:#aaa;border:0;padding:12px 5px;font-size:11px}.bottom button.active{background:#222;color:#fff}}
+</style>
+</head>
+<body>
+<header>
+<div class="brand"><div class="logo">H</div><div><h1>Henas Profit Manager</h1><small>مدیر سود کافه هناس</small></div></div>
+<div><button class="btn" id="installBtn" hidden>نصب</button><button class="btn" onclick="backup()">پشتیبان</button></div>
+</header>
+<main>
+<div class="tabs" id="tabs"></div>
+
+<section class="page active" data-page="dashboard">
+<div class="hero"><h2>سلام 👋</h2><p>اول اطلاعات مواد، رسپی و هزینه‌ها را وارد کن؛ بعد سیستم دقیقاً می‌گوید چه چیزی را گران‌تر کنی، کجا هزینه کم کنی و چقدر فروش لازم داری.</p></div>
+<div class="grid">
+<div class="card kpi"><small>فروش ماه</small><strong id="salesKpi">۰</strong></div>
+<div class="card kpi"><small>سود ناخالص</small><strong id="grossKpi">۰</strong></div>
+<div class="card kpi"><small>سود خالص</small><strong id="netKpi">۰</strong></div>
+<div class="card kpi"><small>حاشیه سود</small><strong id="marginKpi">۰٪</strong></div>
+<div class="card half"><h2>پیشنهادهای هوشمند</h2><div id="insights"></div></div>
+<div class="card half"><h2>هدف سود</h2>
+<div class="form">
+<div><label>سود هدف ماهانه</label><input id="targetProfit" type="number"></div>
+<div><label>روز کاری</label><input id="workDays" type="number"></div>
+<div><label>درصد سود هدف</label><input id="targetMargin" type="number"></div>
+<div><label>ثبت</label><button class="btn good" onclick="saveGoals()">ذخیره هدف</button></div>
+</div>
+<p>فروش اضافه موردنیاز: <strong id="extraSales">۰</strong></p>
+<p>فروش اضافه روزانه: <strong id="extraDaily">۰</strong></p>
+</div>
+</div>
+</section>
+
+<section class="page" data-page="ingredients">
+<div class="card"><h2>مواد اولیه</h2>
+<div class="form">
+<div><label>نام ماده</label><input id="ingName" placeholder="قهوه فول"></div>
+<div><label>قیمت بسته</label><input id="ingPrice" type="number"></div>
+<div><label>مقدار بسته</label><input id="ingPack" type="number" placeholder="1000"></div>
+<div><label>واحد</label><select id="ingUnit"><option>گرم</option><option>میلی‌لیتر</option><option>عدد</option></select></div>
+</div><div class="actions"><button class="btn primary" onclick="addIngredient()">ثبت ماده</button></div>
+<div class="table-wrap"><table id="ingredientsTable"></table></div>
+</div>
+</section>
+
+<section class="page" data-page="products">
+<div class="card"><h2>محصول و رسپی</h2>
+<div class="form">
+<div><label>نام محصول</label><input id="pName" placeholder="لاته"></div>
+<div><label>قیمت فروش</label><input id="pPrice" type="number"></div>
+<div><label>تعداد فروش ماه</label><input id="pQty" type="number"></div>
+<div><label>بسته‌بندی هر سرو</label><input id="pPackCost" type="number" value="0"></div>
+</div>
+<h3>مواد رسپی</h3><div id="recipeRows"></div>
+<div class="actions"><button class="btn" onclick="addRecipeRow()">افزودن ماده</button><button class="btn primary" onclick="addProduct()">ثبت محصول</button></div>
+<div class="table-wrap"><table id="productsTable"></table></div>
+</div>
+</section>
+
+<section class="page" data-page="expenses">
+<div class="grid">
+<div class="card half"><h2>هزینه‌ها</h2>
+<div class="form">
+<div><label>عنوان هزینه</label><input id="eName"></div>
+<div><label>مبلغ</label><input id="eAmount" type="number"></div>
+<div><label>نوع</label><select id="eType"><option>ثابت</option><option>متغیر</option></select></div>
+<div><label>ثبت</label><button class="btn primary" onclick="addExpense()">ثبت هزینه</button></div>
+</div><div class="table-wrap"><table id="expensesTable"></table></div>
+</div>
+<div class="card half"><h2>پرت</h2>
+<div class="form">
+<div><label>ماده</label><select id="wIngredient"></select></div>
+<div><label>مقدار پرت</label><input id="wQty" type="number"></div>
+<div><label>توضیح</label><input id="wNote"></div>
+<div><label>ثبت</label><button class="btn primary" onclick="addWaste()">ثبت پرت</button></div>
+</div><div class="table-wrap"><table id="wasteTable"></table></div>
+</div>
+</div>
+</section>
+
+<section class="page" data-page="analysis">
+<div class="card"><h2>مهندسی منو و تصمیم</h2><div class="table-wrap"><table id="analysisTable"></table></div></div>
+</section>
+</main>
+<nav class="bottom" id="bottom"></nav>
+<script src="./app.js"></script>
+</body>
+</html>

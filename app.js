@@ -1,9 +1,80 @@
-const K="henas_v2";let d=JSON.parse(localStorage.getItem(K)||"null")||{i:[],p:[],e:[],w:[],stock:{},s:{target:50000000,days:30}};let draft=[];let promptInstall=null;const pages=[["dashboard","داشبورد"],["ingredients","مواد"],["products","رسپی"],["expenses","هزینه/پرت"],["inventory","موجودی"],["analysis","تحلیل"]];
-const $=x=>document.getElementById(x),money=n=>(Math.round(+n||0)).toLocaleString("fa-IR")+" تومان",num=n=>(+n||0).toLocaleString("fa-IR",{maximumFractionDigits:1}),id=()=>Date.now()+Math.random();function save(){localStorage.setItem(K,JSON.stringify(d));render()}function nav(){tabs.innerHTML=pages.map((x,i)=>`<button class="${i?'':'active'}" onclick="show('${x[0]}',this)">${x[1]}</button>`).join('')}function show(n,b){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===n));document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active')}
-function addIng(){if(!in.value||+ip.value<=0||+iq.value<=0)return alert('اطلاعات ماده را کامل کنید');let x={id:id(),n:in.value,p:+ip.value,q:+iq.value,u:iu.value};d.i.push(x);d.stock[x.id]=0;in.value=ip.value=iq.value='';save()}function uc(x){return x.q?x.p/x.q:0}function delIng(x){if(d.p.some(p=>p.r.some(r=>r.id===x)))return alert('این ماده در رسپی استفاده شده');d.i=d.i.filter(i=>i.id!==x);save()}
-function openRecipe(){if(!pn.value||!d.i.length)return alert('نام محصول و مواد اولیه لازم است');draft=[];addRow();modal.classList.add('open')}function addRow(){draft.push({id:d.i[0].id,q:0});drawRows()}function drawRows(){rows.innerHTML=draft.map((r,k)=>`<div class="rr"><select onchange="draft[${k}].id=+this.value">${d.i.map(i=>`<option value="${i.id}" ${i.id===r.id?'selected':''}>${i.n} (${i.u})</option>`).join('')}</select><input type="number" placeholder="مقدار" oninput="draft[${k}].q=+this.value"><button class="bad" onclick="draft.splice(${k},1);drawRows()">حذف</button></div>`).join('')}function pcost(p){let raw=p.r.reduce((s,r)=>{let i=d.i.find(x=>x.id===r.id);return s+(i?uc(i)*r.q:0)},0),base=raw*(1+(p.w||0)/100)+(p.c||0)+(p.o||0),fee=(p.price||0)*(p.f||0)/100;return{raw,base,fee,total:base+fee}}function suggestPrice(p){let c=pcost({...p,price:0}).base,m=(p.m||55)/100,f=(p.f||0)/100;return 1-m-f>0?c/(1-m-f):c*2}function saveProd(){if(!draft.length||draft.some(x=>!x.q))return alert('رسپی کامل نیست');d.p.push({id:id(),n:pn.value,price:+pp.value,q:+pq.value,c:+pc.value||0,r:JSON.parse(JSON.stringify(draft)),w:+rw.value||0,o:+ro.value||0,f:+rf.value||0,m:+rm.value||55});pn.value=pp.value=pq.value='';pc.value=0;modal.classList.remove('open');save()}function delProd(x){d.p=d.p.filter(p=>p.id!==x);save()}
-function addExp(){if(!en.value||+ea.value<=0)return alert('هزینه را کامل کنید');d.e.push({id:id(),n:en.value,a:+ea.value,t:et.value});en.value=ea.value='';save()}function delExp(x){d.e=d.e.filter(e=>e.id!==x);save()}function addWaste(){if(!+wi.value||+wq.value<=0)return alert('پرت را کامل کنید');d.w.push({id:id(),i:+wi.value,q:+wq.value});wq.value='';save()}function delWaste(x){d.w=d.w.filter(w=>w.id!==x);save()}
-function metrics(){let sales=0,mat=0,gross=0,fees=0;d.p.forEach(p=>{let c=pcost(p);sales+=p.price*p.q;mat+=c.base*p.q;fees+=c.fee*p.q;gross+=(p.price-c.total)*p.q});let op=d.e.reduce((s,e)=>s+e.a,0),waste=d.w.reduce((s,w)=>{let i=d.i.find(x=>x.id===w.i);return s+(i?uc(i)*w.q:0)},0),net=gross-op-waste,vr=sales?(mat+fees)/sales:0;return{sales,mat,gross,fees,op,waste,net,margin:sales?net/sales*100:0,vr}}
-function settings(){d.s.target=+target.value||0;d.s.days=+days.value||30;save()}function sugg(m){let a=[];if(!d.p.length)a.push(['high','محصولات را ثبت کنید','بدون رسپی امکان تحلیل واقعی وجود ندارد.','اولویت فوری']);d.p.forEach(p=>{let c=pcost(p),sp=suggestPrice(p),mar=p.price?(p.price-c.total)/p.price*100:0;if(p.price<sp*.95)a.push(['high','اصلاح قیمت '+p.n,`قیمت فعلی ${money(p.price)} و قیمت پیشنهادی ${money(sp)} است.`,`اثر ماهانه ${money((sp-p.price)*p.q)}`]);if(mar<35)a.push(['high','حاشیه سود پایین '+p.n,`حاشیه سود این محصول ${num(mar)}٪ است. رسپی یا قیمت را اصلاح کنید.`,'اولویت بالا']);if(mar>=55&&p.q)a.push(['low','محصول سودساز '+p.n,'در منو برجسته و همراه آیتم مکمل پیشنهاد شود.',`سود واحد ${money(p.price-c.total)}`])});if(m.waste>m.sales*.03&&m.sales)a.push(['high','پرت بالا','پرت بیشتر از ۳٪ فروش است.','هزینه '+money(m.waste)]);if(m.margin<15&&m.sales)a.push(['high','سود خالص پایین','فروش دارید اما سود نهایی کم است؛ قیمت و هزینه ثابت را اصلاح کنید.','حاشیه '+num(m.margin)+'٪']);let gap=d.s.target-m.net,con=1-m.vr;if(gap>0&&m.sales)a.push(['med','رسیدن به هدف سود',`حدود ${money(gap/con)} فروش اضافه یا کاهش هزینه لازم است.`,`روزانه ${money(gap/con/d.s.days)}`]);return a.slice(0,8)}
-function render(){let m=metrics();it.innerHTML='<tr><th>ماده</th><th>قیمت بسته</th><th>مقدار</th><th>هزینه واحد</th><th></th></tr>'+d.i.map(i=>`<tr><td>${i.n}</td><td>${money(i.p)}</td><td>${num(i.q)} ${i.u}</td><td>${money(uc(i))}</td><td><button class="bad" onclick="delIng(${i.id})">حذف</button></td></tr>`).join('');wi.innerHTML=d.i.map(i=>`<option value="${i.id}">${i.n}</option>`).join('');pt.innerHTML='<tr><th>محصول</th><th>هزینه ساخت</th><th>قیمت</th><th>پیشنهادی</th><th>سود واحد</th><th>تعداد</th><th></th></tr>'+d.p.map(p=>{let c=pcost(p);return`<tr><td>${p.n}</td><td>${money(c.total)}</td><td>${money(p.price)}</td><td>${money(suggestPrice(p))}</td><td>${money(p.price-c.total)}</td><td>${num(p.q)}</td><td><button class="bad" onclick="delProd(${p.id})">حذف</button></td></tr>`}).join('');ext.innerHTML='<tr><th>هزینه</th><th>مبلغ</th><th>نوع</th><th></th></tr>'+d.e.map(e=>`<tr><td>${e.n}</td><td>${money(e.a)}</td><td>${e.t}</td><td><button class="bad" onclick="delExp(${e.id})">حذف</button></td></tr>`).join('');wt.innerHTML='<tr><th>ماده</th><th>مقدار</th><th>ارزش</th><th></th></tr>'+d.w.map(w=>{let i=d.i.find(x=>x.id===w.i);return`<tr><td>${i?.n||''}</td><td>${num(w.q)} ${i?.u||''}</td><td>${money(i?uc(i)*w.q:0)}</td><td><button class="bad" onclick="delWaste(${w.id})">حذف</button></td></tr>`}).join('');ivt.innerHTML='<tr><th>ماده</th><th>موجودی</th><th>نیاز ماه</th><th>پیشنهاد خرید</th></tr>'+d.i.map(i=>{let need=d.p.reduce((s,p)=>s+p.q*p.r.filter(r=>r.id===i.id).reduce((a,r)=>a+r.q,0),0),stock=+d.stock[i.id]||0,buy=Math.max(0,need-stock);return`<tr><td>${i.n}</td><td><input type="number" value="${stock}" onchange="d.stock[${i.id}]=+this.value;save()"></td><td>${num(need)} ${i.u}</td><td>${buy?num(buy)+' '+i.u+' ≈ '+money(buy*uc(i)):'نیازی نیست'}</td></tr>`}).join('');let avg=d.p.length?m.sales/d.p.length:0;at.innerHTML='<tr><th>محصول</th><th>فروش</th><th>حاشیه</th><th>دسته</th><th>تصمیم</th></tr>'+d.p.map(p=>{let c=pcost(p),s=p.price*p.q,mar=p.price?(p.price-c.total)/p.price*100:0,cat,dec;if(s>=avg&&mar>=45){cat='ستاره';dec='تبلیغ بیشتر'}else if(s>=avg&&mar<35){cat='پرفروش کم‌سود';dec='افزایش قیمت'}else if(s<avg&&mar>=45){cat='سودساز پنهان';dec='برجسته‌سازی'}else{cat='ضعیف';dec='بازطراحی/حذف'}return`<tr><td>${p.n}</td><td>${money(s)}</td><td>${num(mar)}٪</td><td><span class="badge">${cat}</span></td><td>${dec}</td></tr>`}).join('');sales.textContent=money(m.sales);gross.textContent=money(m.gross);net.textContent=money(m.net);margin.textContent=num(m.margin)+'٪';net.className=m.net>=0?'green':'red';target.value=d.s.target;days.value=d.s.days;let g=d.s.target-m.net,con=1-m.vr,extra=g>0&&con>0?g/con:0;gap.textContent=money(Math.max(0,g));daily.textContent=money(extra/d.s.days);suggestions.innerHTML=sugg(m).map(x=>`<div class="sug ${x[0]}"><b>${x[1]}</b><div>${x[2]}</div><strong>${x[3]}</strong></div>`).join('');pnl.innerHTML=`فروش: <b>${money(m.sales)}</b><br>مواد: <b>${money(m.mat)}</b><br>کارمزد: <b>${money(m.fees)}</b><br>هزینه عملیاتی: <b>${money(m.op)}</b><br>پرت: <b>${money(m.waste)}</b><br>سود خالص: <b>${money(m.net)}</b>`;scenario.innerHTML=g<=0?'<div class="sug low">هدف سود محقق شده است.</div>':`<div class="sug med">برای رسیدن به هدف حدود <b>${money(extra)}</b> فروش اضافه یا کاهش هزینه لازم است؛ روزانه <b>${money(extra/d.s.days)}</b>.</div>`}
-function backup(){let b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='henas-backup.json';a.click()}function restore(e){let f=e.target.files[0],r=new FileReader();r.onload=()=>{try{d=JSON.parse(r.result);save();alert('بازیابی شد')}catch{alert('فایل نامعتبر')}};r.readAsText(f)}window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptInstall=e;install.hidden=false});install.onclick=async()=>{if(promptInstall){promptInstall.prompt();await promptInstall.userChoice;promptInstall=null;install.hidden=true}};if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js'));nav();render();
+const KEY="henas-v3";
+let db=JSON.parse(localStorage.getItem(KEY)||"null")||{ingredients:[],products:[],expenses:[],wastes:[],settings:{targetProfit:50000000,workDays:30,targetMargin:25}};
+let recipe=[];
+const pages=[["dashboard","داشبورد"],["ingredients","مواد"],["products","رسپی"],["expenses","هزینه/پرت"],["analysis","تحلیل"]];
+const $=id=>document.getElementById(id);
+function money(n){return Math.round(Number(n)||0).toLocaleString("fa-IR")+" تومان"}
+function num(n){return (Number(n)||0).toLocaleString("fa-IR",{maximumFractionDigits:1})}
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function nav(){
+ $("tabs").innerHTML=pages.map((p,i)=>`<button class="tab ${i?"":"active"}" onclick="show('${p[0]}')">${p[1]}</button>`).join("");
+ $("bottom").innerHTML=pages.map((p,i)=>`<button class="${i?"":"active"}" onclick="show('${p[0]}')">${p[1]}</button>`).join("");
+}
+function show(name){
+ document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.dataset.page===name));
+ document.querySelectorAll(".tab,.bottom button").forEach(x=>x.classList.remove("active"));
+ [...document.querySelectorAll(".tab,.bottom button")].filter(x=>x.textContent===pages.find(p=>p[0]===name)[1]).forEach(x=>x.classList.add("active"));
+ scrollTo(0,0);
+}
+function addIngredient(){
+ let n=$("ingName").value.trim(),price=+$("ingPrice").value,pack=+$("ingPack").value,unit=$("ingUnit").value;
+ if(!n||price<=0||pack<=0)return alert("اطلاعات ماده را کامل کن.");
+ db.ingredients.push({id:Date.now(),name:n,price,pack,unit});$("ingName").value=$("ingPrice").value=$("ingPack").value="";save();
+}
+function uc(i){return i.price/i.pack}
+function addRecipeRow(){if(!db.ingredients.length)return alert("اول ماده اولیه ثبت کن.");recipe.push({ingredientId:db.ingredients[0].id,qty:0});renderRecipe()}
+function renderRecipe(){
+ $("recipeRows").innerHTML=recipe.map((r,i)=>`<div class="form" style="margin-bottom:8px">
+ <div><select onchange="recipe[${i}].ingredientId=+this.value">${db.ingredients.map(x=>`<option value="${x.id}" ${x.id===r.ingredientId?"selected":""}>${x.name}</option>`).join("")}</select></div>
+ <div><input type="number" placeholder="مقدار" oninput="recipe[${i}].qty=+this.value" value="${r.qty||""}"></div>
+ <div><button class="btn danger" onclick="recipe.splice(${i},1);renderRecipe()">حذف</button></div></div>`).join("");
+}
+function cost(p){return p.recipe.reduce((s,r)=>{let i=db.ingredients.find(x=>x.id===r.ingredientId);return s+(i?uc(i)*r.qty:0)},0)+(p.packCost||0)}
+function addProduct(){
+ let name=$("pName").value.trim(),price=+$("pPrice").value,qty=+$("pQty").value,packCost=+$("pPackCost").value||0;
+ if(!name||price<=0||!recipe.length||recipe.some(r=>r.qty<=0))return alert("اطلاعات محصول و رسپی را کامل کن.");
+ db.products.push({id:Date.now(),name,price,qty,packCost,recipe:JSON.parse(JSON.stringify(recipe))});recipe=[];$("pName").value=$("pPrice").value=$("pQty").value="";$("pPackCost").value=0;renderRecipe();save();
+}
+function addExpense(){let name=$("eName").value.trim(),amount=+$("eAmount").value,type=$("eType").value;if(!name||amount<=0)return;db.expenses.push({id:Date.now(),name,amount,type});$("eName").value=$("eAmount").value="";save()}
+function addWaste(){let ingredientId=+$("wIngredient").value,qty=+$("wQty").value,note=$("wNote").value;if(!ingredientId||qty<=0)return;db.wastes.push({id:Date.now(),ingredientId,qty,note});$("wQty").value=$("wNote").value="";save()}
+function del(type,id){db[type]=db[type].filter(x=>x.id!==id);save()}
+function metrics(){
+ let sales=0,gross=0,mat=0;db.products.forEach(p=>{let c=cost(p);sales+=p.price*p.qty;mat+=c*p.qty;gross+=(p.price-c)*p.qty});
+ let expenses=db.expenses.reduce((s,e)=>s+e.amount,0);
+ let waste=db.wastes.reduce((s,w)=>{let i=db.ingredients.find(x=>x.id===w.ingredientId);return s+(i?uc(i)*w.qty:0)},0);
+ let net=gross-expenses-waste,margin=sales?net/sales*100:0,vr=sales?mat/sales:0;
+ return{sales,gross,expenses,waste,net,margin,vr};
+}
+function insights(m){
+ let a=[];
+ if(!db.products.length)a.push(["high","داده کافی نیست","اول مواد اولیه و رسپی محصولات را ثبت کن.","شروع تحلیل"]);
+ db.products.forEach(p=>{let c=cost(p),mar=p.price?(p.price-c)/p.price*100:0,sp=c/.45;
+ if(mar<35)a.push(["high",`قیمت ${p.name} را اصلاح کن`,`حاشیه سود این محصول فقط ${num(mar)}٪ است. قیمت پیشنهادی اولیه ${money(sp)} است.`,`اثر ماهانه بالقوه: ${money(Math.max(0,(sp-p.price)*p.qty))}`]);
+ else if(mar>=55)a.push(["low",`${p.name} سودساز است`,"این محصول را بیشتر پیشنهاد بده و در منو برجسته کن.",`سود هر سرو: ${money(p.price-c)}`]);
+ });
+ if(m.margin<15&&m.sales>0)a.push(["high","فروش بالا، سود پایین","هزینه‌های ثابت و محصولات پرفروش کم‌سود را فوراً بررسی کن.",`حاشیه سود فعلی: ${num(m.margin)}٪`]);
+ if(m.waste>m.sales*.03&&m.sales>0)a.push(["medium","پرت زیاد است","پرت بیش از ۳٪ فروش شده است.",`ارزش پرت: ${money(m.waste)}`]);
+ let gap=db.settings.targetProfit-m.net,con=1-m.vr,extra=gap>0&&con>0?gap/con:0;
+ if(extra>0)a.push(["medium","برنامه رسیدن به هدف",`برای رسیدن به سود هدف، حدود ${money(extra)} فروش بیشتر یا کاهش هزینه معادل آن لازم است.`,`روزانه: ${money(extra/db.settings.workDays)}`]);
+ return a.slice(0,7);
+}
+function saveGoals(){db.settings.targetProfit=+$("targetProfit").value;db.settings.workDays=+$("workDays").value||30;db.settings.targetMargin=+$("targetMargin").value||25;save()}
+function backup(){let b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="henas-backup.json";a.click()}
+function render(){
+ let m=metrics();
+ $("salesKpi").textContent=money(m.sales);$("grossKpi").textContent=money(m.gross);$("netKpi").textContent=money(m.net);$("marginKpi").textContent=num(m.margin)+"٪";
+ $("netKpi").className=m.net>=0?"goodText":"badText";$("marginKpi").className=m.margin>=25?"goodText":m.margin>=15?"warnText":"badText";
+ $("targetProfit").value=db.settings.targetProfit;$("workDays").value=db.settings.workDays;$("targetMargin").value=db.settings.targetMargin;
+ let gap=db.settings.targetProfit-m.net,con=1-m.vr,extra=gap>0&&con>0?gap/con:0;$("extraSales").textContent=money(extra);$("extraDaily").textContent=money(extra/db.settings.workDays);
+ $("insights").innerHTML=insights(m).map(x=>`<div class="insight ${x[0]}"><strong>${x[1]}</strong><div>${x[2]}</div><div>${x[3]}</div></div>`).join("");
+ $("ingredientsTable").innerHTML="<tr><th>ماده</th><th>بسته</th><th>هزینه واحد</th><th></th></tr>"+db.ingredients.map(i=>`<tr><td>${i.name}</td><td>${money(i.price)} / ${num(i.pack)} ${i.unit}</td><td>${money(uc(i))}</td><td><button class="btn danger" onclick="del('ingredients',${i.id})">حذف</button></td></tr>`).join("");
+ $("wIngredient").innerHTML=db.ingredients.map(i=>`<option value="${i.id}">${i.name}</option>`).join("");
+ $("productsTable").innerHTML="<tr><th>محصول</th><th>هزینه ساخت</th><th>قیمت</th><th>سود واحد</th><th></th></tr>"+db.products.map(p=>`<tr><td>${p.name}</td><td>${money(cost(p))}</td><td>${money(p.price)}</td><td>${money(p.price-cost(p))}</td><td><button class="btn danger" onclick="del('products',${p.id})">حذف</button></td></tr>`).join("");
+ $("expensesTable").innerHTML="<tr><th>هزینه</th><th>مبلغ</th><th>نوع</th><th></th></tr>"+db.expenses.map(e=>`<tr><td>${e.name}</td><td>${money(e.amount)}</td><td>${e.type}</td><td><button class="btn danger" onclick="del('expenses',${e.id})">حذف</button></td></tr>`).join("");
+ $("wasteTable").innerHTML="<tr><th>ماده</th><th>مقدار</th><th>ارزش</th><th></th></tr>"+db.wastes.map(w=>{let i=db.ingredients.find(x=>x.id===w.ingredientId);return `<tr><td>${i?.name||"-"}</td><td>${num(w.qty)}</td><td>${money(i?uc(i)*w.qty:0)}</td><td><button class="btn danger" onclick="del('wastes',${w.id})">حذف</button></td></tr>`}).join("");
+ let avg=db.products.length?m.sales/db.products.length:0;
+ $("analysisTable").innerHTML="<tr><th>محصول</th><th>فروش</th><th>حاشیه</th><th>دسته</th><th>تصمیم</th></tr>"+db.products.map(p=>{let c=cost(p),sales=p.price*p.qty,mar=p.price?(p.price-c)/p.price*100:0,cat,cls,act;if(sales>=avg&&mar>=45){cat="ستاره";cls="good";act="تبلیغ بیشتر"}else if(sales>=avg&&mar<35){cat="پرفروش کم‌سود";cls="bad";act="افزایش قیمت"}else if(sales<avg&&mar>=45){cat="سودساز پنهان";cls="warn";act="فروش مکمل"}else{cat="ضعیف";cls="bad";act="بازطراحی یا حذف"}return `<tr><td>${p.name}</td><td>${money(sales)}</td><td>${num(mar)}٪</td><td><span class="chip ${cls}">${cat}</span></td><td>${act}</td></tr>`}).join("");
+}
+let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").hidden=false});$("installBtn").onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;$("installBtn").hidden=true}};
+if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js"));
+nav();render();
