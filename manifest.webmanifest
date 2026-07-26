@@ -1,11 +1,12 @@
 {
-  "name": "Henas Profit Manager",
-  "short_name": "Henas",
+  "name": "Henas Cafe OS",
+  "short_name": "Henas OS",
+  "description": "سیستم مدیریت هوشمند کافه هناس با دستیار باریستا، رسپی، مالی و موجودی",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#111111",
-  "theme_color": "#111111",
+  "background_color": "#101010",
+  "theme_color": "#101010",
   "lang": "fa",
   "dir": "rtl",
   "icons": [

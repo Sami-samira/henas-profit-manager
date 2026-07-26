@@ -1,113 +1,220 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#111111">
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="icon" href="./icons/icon-192.png">
-<link rel="apple-touch-icon" href="./icons/icon-192.png">
-<title>Henas Profit</title>
-<style>
-@font-face{font-family:Vazirmatn;src:local("Vazirmatn"),local("Vazir")}
-:root{--bg:#111;--surface:#1b1b1b;--surface2:#242424;--line:#383838;--text:#f1f1f1;--muted:#aaa;--green:#8aaa7c;--red:#d56d6d;--amber:#d2a45f}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Vazirmatn,Tahoma,Arial,sans-serif;padding-bottom:72px}
-header{position:sticky;top:0;z-index:20;padding:16px;background:rgba(17,17,17,.97);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
-.brand{display:flex;gap:12px;align-items:center}.logo{width:46px;height:46px;border:1px solid #555;border-radius:16px;display:grid;place-items:center;background:#050505;font-weight:900}.brand h1{margin:0;font-size:19px}.brand small{color:var(--muted)}
-button,input,select{font:inherit}.btn{background:#262626;border:1px solid #4a4a4a;color:#eee;padding:10px 13px;border-radius:12px}.btn.primary{background:#050505}.btn.danger{background:#492828}.btn.good{background:#2c402d}
-main{max-width:1200px;margin:auto;padding:14px}.tabs{display:flex;gap:8px;overflow:auto;margin-bottom:14px}.tab{white-space:nowrap;background:#1a1a1a;border:1px solid #3a3a3a;color:#bbb;border-radius:12px;padding:10px 13px}.tab.active{background:#050505;color:#fff}
-.page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.card{grid-column:span 12;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
-.kpi{grid-column:span 3}.half{grid-column:span 6}.kpi small{color:var(--muted)}.kpi strong{font-size:25px;display:block;margin-top:8px}.goodText{color:#b2d3a7}.badText{color:#e58a8a}.warnText{color:#e0b978}
-.form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}label{font-size:12px;color:#c7c7c7;display:block;margin-bottom:6px}input,select{width:100%;background:#131313;border:1px solid #4a4a4a;color:white;border-radius:12px;padding:11px}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.table-wrap{overflow:auto;max-height:480px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #373737;text-align:right}th{background:#222;color:#ddd;position:sticky;top:0}.chip{display:inline-block;border-radius:999px;padding:4px 9px;font-size:11px;background:#303030}.chip.good{background:#29402c}.chip.bad{background:#482828}.chip.warn{background:#4d3c22}
-.insight{background:#141414;border-right:4px solid #777;padding:13px;border-radius:13px;margin:9px 0;line-height:1.8}.insight.high{border-color:var(--red)}.insight.medium{border-color:var(--amber)}.insight.low{border-color:var(--green)}
-.hero{background:linear-gradient(135deg,#232323,#151515);border:1px solid #444;border-radius:20px;padding:20px;margin-bottom:12px}.hero h2{margin:0 0 8px}.hero p{color:#bbb;margin:0;line-height:1.8}
-.bottom{display:none}
-@media(max-width:850px){.kpi{grid-column:span 6}.half{grid-column:span 12}.form{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){main{padding:10px}.tabs{display:none}.kpi{grid-column:span 6}.form{grid-template-columns:1fr}.bottom{display:flex;position:fixed;bottom:0;left:0;right:0;background:#0c0c0c;border-top:1px solid #444;z-index:30;overflow:auto}.bottom button{min-width:74px;flex:1;background:none;color:#aaa;border:0;padding:12px 5px;font-size:11px}.bottom button.active{background:#222;color:#fff}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101010">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <title>Henas Cafe OS</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap');
+    :root{
+      --bg:#101010;--surface:#191919;--surface2:#222;--surface3:#2a2a2a;--line:#3b3b3b;
+      --text:#ececec;--muted:#a9a9a9;--black:#050505;--green:#7fa26f;--green2:#b3d2a8;
+      --amber:#c9964c;--red:#c65e5e;--blue:#7d93a8;--shadow:0 18px 45px rgba(0,0,0,.26)
+    }
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Vazirmatn,Tahoma,Arial,sans-serif}
+    body{padding-bottom:82px}button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .app{max-width:1440px;margin:auto}
+    header{position:sticky;top:0;z-index:40;background:rgba(12,12,12,.96);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);padding:13px 16px;display:flex;align-items:center;justify-content:space-between}
+    .brand{display:flex;align-items:center;gap:12px}.logo{width:48px;height:48px;border-radius:16px;background:linear-gradient(145deg,#080808,#242424);border:1px solid #555;display:grid;place-items:center;font-weight:900;font-size:21px;box-shadow:var(--shadow)}
+    .brand h1{font-size:19px;margin:0}.brand small{color:var(--muted)}
+    .header-actions{display:flex;gap:8px}.btn{border:1px solid #4c4c4c;background:#242424;color:#eee;border-radius:13px;padding:10px 13px;font-weight:700}.btn:hover{background:#303030}
+    .btn.primary{background:#050505;border-color:#666}.btn.good{background:#2e412f}.btn.warn{background:#4b3922}.btn.danger{background:#4a2828}.btn.icon{width:42px;padding:9px}
+    main{padding:14px}.desktop-tabs{display:flex;gap:8px;overflow:auto;margin-bottom:14px;position:sticky;top:75px;z-index:30;background:var(--bg);padding:5px 0 10px}
+    .tab{white-space:nowrap;border:1px solid #3c3c3c;background:#181818;color:#bbb;border-radius:13px;padding:10px 14px;font-weight:700}.tab.active{background:#050505;color:#fff;border-color:#666}
+    .page{display:none}.page.active{display:block}
+    .hero{padding:22px;border:1px solid #454545;border-radius:22px;background:radial-gradient(circle at 85% 0%,#303030 0,#1b1b1b 42%,#151515 100%);box-shadow:var(--shadow);margin-bottom:14px}
+    .hero-top{display:flex;align-items:center;justify-content:space-between;gap:14px}.hero h2{margin:0 0 8px;font-size:25px}.hero p{margin:0;color:#c6c6c6;line-height:1.9}
+    .hero-orb{min-width:78px;width:78px;height:78px;border-radius:24px;background:linear-gradient(145deg,#0a0a0a,#343434);border:1px solid #595959;display:grid;place-items:center;font-size:30px}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:13px}.card{grid-column:span 12;background:var(--surface);border:1px solid var(--line);border-radius:19px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.16)}
+    .span3{grid-column:span 3}.span4{grid-column:span 4}.span5{grid-column:span 5}.span6{grid-column:span 6}.span7{grid-column:span 7}.span8{grid-column:span 8}
+    .card h2,.card h3{margin-top:0}.kpi small{color:var(--muted);font-size:12px}.kpi strong{display:block;font-size:26px;margin-top:8px}.kpi .trend{font-size:12px;margin-top:7px;color:#bbb}
+    .goodText{color:var(--green2)}.warnText{color:#e1b36d}.badText{color:#e48b8b}
+    .section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+    .form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.form.two{grid-template-columns:repeat(2,1fr)}label{display:block;color:#c7c7c7;font-size:12px;margin-bottom:6px}
+    input,select,textarea{width:100%;background:#121212;color:#eee;border:1px solid #4a4a4a;border-radius:13px;padding:11px 12px}
+    textarea{min-height:100px;resize:vertical}input:focus,select:focus,textarea:focus{outline:2px solid #6a6a6a;border-color:#777}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.table-wrap{overflow:auto;max-height:460px;border-radius:13px}
+    table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #383838;text-align:right}th{background:#232323;color:#ddd;position:sticky;top:0;z-index:2}
+    .chip{display:inline-block;padding:4px 9px;border-radius:999px;font-size:11px;background:#333}.chip.good{background:#2e452f}.chip.warn{background:#4b3922}.chip.bad{background:#4b2929}
+    .insight{background:#131313;border:1px solid #323232;border-right:4px solid var(--blue);padding:13px;border-radius:13px;margin-bottom:9px;line-height:1.8}.insight.high{border-right-color:var(--red)}.insight.medium{border-right-color:var(--amber)}.insight.low{border-right-color:var(--green)}
+    .insight h4{margin:0 0 6px}.insight p{margin:3px 0;color:#c9c9c9}.impact{font-weight:800}
+    .chat-shell{display:grid;grid-template-rows:auto 1fr auto;min-height:610px;background:#151515;border:1px solid #404040;border-radius:22px;overflow:hidden}
+    .chat-head{padding:15px 16px;border-bottom:1px solid #353535;display:flex;align-items:center;justify-content:space-between;background:#1c1c1c}
+    .assistant-id{display:flex;align-items:center;gap:10px}.assistant-avatar{width:42px;height:42px;border-radius:14px;background:#050505;border:1px solid #555;display:grid;place-items:center}
+    .chat-messages{padding:16px;overflow:auto;max-height:580px}.msg{display:flex;margin:10px 0}.msg.user{justify-content:flex-start}.bubble{max-width:min(86%,680px);padding:12px 14px;border-radius:16px;line-height:1.9;white-space:pre-wrap}
+    .msg.user .bubble{background:#303030;border-bottom-right-radius:5px}.msg.bot .bubble{background:#202820;border:1px solid #3d533e;border-bottom-left-radius:5px}
+    .chat-input{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:12px;border-top:1px solid #363636;background:#191919}.chat-input input{height:47px}
+    .quick-prompts{display:flex;gap:7px;overflow:auto;padding:0 16px 12px}.quick{white-space:nowrap;border:1px solid #414141;background:#232323;color:#ddd;border-radius:999px;padding:8px 11px;font-size:12px}
+    .recipe-card{background:#151515;border:1px solid #383838;border-radius:16px;padding:14px;margin-bottom:10px}.recipe-card h3{margin:0 0 8px}.recipe-meta{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.recipe-steps{color:#ccc;line-height:1.9}
+    .recipe-line{display:grid;grid-template-columns:2fr 1fr auto;gap:8px;margin-bottom:8px}.empty{padding:25px;text-align:center;color:#aaa}
+    .bottom-nav{display:none}.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:80;align-items:center;justify-content:center;padding:18px}.modal.open{display:flex}.modal-card{width:min(760px,100%);max-height:92vh;overflow:auto;background:#202020;border:1px solid #555;border-radius:20px;padding:18px}
+    .bar-chart{height:220px;display:flex;align-items:flex-end;gap:9px;padding-top:12px;border-bottom:1px solid #444}.bar-item{flex:1;min-width:36px;display:flex;flex-direction:column;align-items:center;gap:6px}.bar-visual{width:100%;background:linear-gradient(180deg,#8b8b8b,#444);border-radius:8px 8px 0 0}.bar-item small{font-size:10px;color:#aaa;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    @media(max-width:1000px){.span3,.span4{grid-column:span 6}.span5,.span6,.span7,.span8{grid-column:span 12}.form{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:650px){main{padding:10px}.desktop-tabs{display:none}.span3,.span4,.span5,.span6,.span7,.span8{grid-column:span 12}.kpi{grid-column:span 6}.form,.form.two{grid-template-columns:1fr}.hero h2{font-size:21px}.hero-orb{width:64px;height:64px;min-width:64px}.bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#0b0b0b;border-top:1px solid #414141;z-index:60;overflow:auto}.bottom-nav button{min-width:73px;flex:1;border:0;background:none;color:#aaa;padding:11px 5px;font-size:10px}.bottom-nav button.active{background:#242424;color:#fff}.header-actions .desktop-only{display:none}.chat-shell{min-height:calc(100vh - 170px)}.chat-messages{max-height:calc(100vh - 330px)}}
+  </style>
 </head>
 <body>
+<div class="app">
 <header>
-<div class="brand"><div class="logo">H</div><div><h1>Henas Profit Manager</h1><small>مدیر سود کافه هناس</small></div></div>
-<div><button class="btn" id="installBtn" hidden>نصب</button><button class="btn" onclick="backup()">پشتیبان</button></div>
+  <div class="brand">
+    <div class="logo">H</div>
+    <div><h1>Henas Cafe OS</h1><small>سیستم مدیریت هوشمند کافه هناس</small></div>
+  </div>
+  <div class="header-actions">
+    <button class="btn" id="installBtn" hidden>نصب</button>
+    <button class="btn desktop-only" onclick="exportData()">پشتیبان</button>
+  </div>
 </header>
+
 <main>
-<div class="tabs" id="tabs"></div>
+  <div class="desktop-tabs" id="tabs"></div>
 
-<section class="page active" data-page="dashboard">
-<div class="hero"><h2>سلام 👋</h2><p>اول اطلاعات مواد، رسپی و هزینه‌ها را وارد کن؛ بعد سیستم دقیقاً می‌گوید چه چیزی را گران‌تر کنی، کجا هزینه کم کنی و چقدر فروش لازم داری.</p></div>
-<div class="grid">
-<div class="card kpi"><small>فروش ماه</small><strong id="salesKpi">۰</strong></div>
-<div class="card kpi"><small>سود ناخالص</small><strong id="grossKpi">۰</strong></div>
-<div class="card kpi"><small>سود خالص</small><strong id="netKpi">۰</strong></div>
-<div class="card kpi"><small>حاشیه سود</small><strong id="marginKpi">۰٪</strong></div>
-<div class="card half"><h2>پیشنهادهای هوشمند</h2><div id="insights"></div></div>
-<div class="card half"><h2>هدف سود</h2>
-<div class="form">
-<div><label>سود هدف ماهانه</label><input id="targetProfit" type="number"></div>
-<div><label>روز کاری</label><input id="workDays" type="number"></div>
-<div><label>درصد سود هدف</label><input id="targetMargin" type="number"></div>
-<div><label>ثبت</label><button class="btn good" onclick="saveGoals()">ذخیره هدف</button></div>
-</div>
-<p>فروش اضافه موردنیاز: <strong id="extraSales">۰</strong></p>
-<p>فروش اضافه روزانه: <strong id="extraDaily">۰</strong></p>
-</div>
-</div>
-</section>
+  <section class="page active" data-page="dashboard">
+    <div class="hero">
+      <div class="hero-top">
+        <div><h2>سلام، امروز کافه چطور پیش می‌رود؟</h2><p>داده‌های فروش، رسپی و هزینه را ثبت کن تا سیستم هر روز تصمیم‌های سودساز و هشدارهای عملیاتی بدهد.</p></div>
+        <div class="hero-orb">✦</div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card kpi span3"><small>فروش ماه</small><strong id="kSales">۰</strong><div class="trend">بر اساس تعداد فروش محصولات</div></div>
+      <div class="card kpi span3"><small>سود ناخالص</small><strong id="kGross">۰</strong><div class="trend">پس از بهای مواد اولیه</div></div>
+      <div class="card kpi span3"><small>سود خالص</small><strong id="kNet">۰</strong><div class="trend">پس از هزینه‌ها و پرت</div></div>
+      <div class="card kpi span3"><small>حاشیه سود</small><strong id="kMargin">۰٪</strong><div class="trend" id="kStatus">نیازمند داده</div></div>
 
-<section class="page" data-page="ingredients">
-<div class="card"><h2>مواد اولیه</h2>
-<div class="form">
-<div><label>نام ماده</label><input id="ingName" placeholder="قهوه فول"></div>
-<div><label>قیمت بسته</label><input id="ingPrice" type="number"></div>
-<div><label>مقدار بسته</label><input id="ingPack" type="number" placeholder="1000"></div>
-<div><label>واحد</label><select id="ingUnit"><option>گرم</option><option>میلی‌لیتر</option><option>عدد</option></select></div>
-</div><div class="actions"><button class="btn primary" onclick="addIngredient()">ثبت ماده</button></div>
-<div class="table-wrap"><table id="ingredientsTable"></table></div>
-</div>
-</section>
+      <div class="card span7">
+        <div class="section-title"><h2>تصمیم‌های امروز</h2><button class="btn" onclick="showPage('assistant')">از مدیر هوشمند بپرس</button></div>
+        <div id="managerInsights"></div>
+      </div>
+      <div class="card span5">
+        <h2>هدف سود ماهانه</h2>
+        <div class="form two">
+          <div><label>سود هدف</label><input id="targetProfit" type="number"></div>
+          <div><label>روز کاری</label><input id="workDays" type="number"></div>
+          <div><label>حاشیه سود هدف</label><input id="targetMargin" type="number"></div>
+          <div><label>ذخیره</label><button class="btn good" onclick="saveSettings()">ثبت هدف</button></div>
+        </div>
+        <hr style="border-color:#3b3b3b">
+        <p>فروش اضافه موردنیاز: <strong id="extraSales">۰</strong></p>
+        <p>فروش اضافه روزانه: <strong id="extraDaily">۰</strong></p>
+      </div>
 
-<section class="page" data-page="products">
-<div class="card"><h2>محصول و رسپی</h2>
-<div class="form">
-<div><label>نام محصول</label><input id="pName" placeholder="لاته"></div>
-<div><label>قیمت فروش</label><input id="pPrice" type="number"></div>
-<div><label>تعداد فروش ماه</label><input id="pQty" type="number"></div>
-<div><label>بسته‌بندی هر سرو</label><input id="pPackCost" type="number" value="0"></div>
-</div>
-<h3>مواد رسپی</h3><div id="recipeRows"></div>
-<div class="actions"><button class="btn" onclick="addRecipeRow()">افزودن ماده</button><button class="btn primary" onclick="addProduct()">ثبت محصول</button></div>
-<div class="table-wrap"><table id="productsTable"></table></div>
-</div>
-</section>
+      <div class="card span6"><h2>سود محصولات</h2><div id="profitChart" class="bar-chart"></div></div>
+      <div class="card span6"><h2>فروش محصولات</h2><div id="salesChart" class="bar-chart"></div></div>
+    </div>
+  </section>
 
-<section class="page" data-page="expenses">
-<div class="grid">
-<div class="card half"><h2>هزینه‌ها</h2>
-<div class="form">
-<div><label>عنوان هزینه</label><input id="eName"></div>
-<div><label>مبلغ</label><input id="eAmount" type="number"></div>
-<div><label>نوع</label><select id="eType"><option>ثابت</option><option>متغیر</option></select></div>
-<div><label>ثبت</label><button class="btn primary" onclick="addExpense()">ثبت هزینه</button></div>
-</div><div class="table-wrap"><table id="expensesTable"></table></div>
-</div>
-<div class="card half"><h2>پرت</h2>
-<div class="form">
-<div><label>ماده</label><select id="wIngredient"></select></div>
-<div><label>مقدار پرت</label><input id="wQty" type="number"></div>
-<div><label>توضیح</label><input id="wNote"></div>
-<div><label>ثبت</label><button class="btn primary" onclick="addWaste()">ثبت پرت</button></div>
-</div><div class="table-wrap"><table id="wasteTable"></table></div>
-</div>
-</div>
-</section>
+  <section class="page" data-page="assistant">
+    <div class="chat-shell">
+      <div class="chat-head">
+        <div class="assistant-id"><div class="assistant-avatar">☕</div><div><strong>دستیار باریستا هناس</strong><div style="color:#aaa;font-size:12px">رسپی، آموزش، عیب‌یابی و استاندارد سرو</div></div></div>
+        <button class="btn" onclick="speakLastAnswer()">خواندن پاسخ</button>
+      </div>
+      <div class="quick-prompts">
+        <button class="quick" onclick="askQuick('لاته وانیل چطور درست میشه؟')">لاته وانیل چطور درست میشه؟</button>
+        <button class="quick" onclick="askQuick('چرا فوم شیر خراب میشه؟')">چرا فوم شیر خراب میشه؟</button>
+        <button class="quick" onclick="askQuick('برای آیس موکا چه لیوانی بردارم؟')">لیوان آیس موکا</button>
+        <button class="quick" onclick="askQuick('قهوه فول نداریم، چی پیشنهاد بدیم؟')">جایگزین موجودی</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <button class="btn icon" onclick="startVoice()">🎙</button>
+        <input id="chatInput" placeholder="مثلاً: آیس لاته چطور درست میشه؟" onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="btn primary" onclick="sendChat()">ارسال</button>
+      </div>
+    </div>
+  </section>
 
-<section class="page" data-page="analysis">
-<div class="card"><h2>مهندسی منو و تصمیم</h2><div class="table-wrap"><table id="analysisTable"></table></div></div>
-</section>
+  <section class="page" data-page="recipes">
+    <div class="grid">
+      <div class="card span5">
+        <h2>ثبت رسپی جدید</h2>
+        <div class="form two">
+          <div><label>نام محصول</label><input id="rName" placeholder="لاته وانیل"></div>
+          <div><label>دسته</label><select id="rCategory"><option>گرم</option><option>سرد</option><option>دسر</option><option>غذا</option></select></div>
+          <div><label>سایز/لیوان</label><input id="rCup" placeholder="۳۵۰ میلی‌لیتر"></div>
+          <div><label>زمان استاندارد</label><input id="rTime" placeholder="۲ دقیقه"></div>
+        </div>
+        <h3>مواد رسپی</h3><div id="recipeRows"></div>
+        <button class="btn" onclick="addRecipeRow()">افزودن ماده</button>
+        <div style="margin-top:10px"><label>مراحل تهیه</label><textarea id="rSteps" placeholder="هر مرحله را در یک خط بنویس"></textarea></div>
+        <div class="form two">
+          <div><label>دمای سرو/شیر</label><input id="rTemp" placeholder="۶۰ تا ۶۵ درجه"></div>
+          <div><label>آلرژن‌ها</label><input id="rAllergens" placeholder="لبنیات، مغزها"></div>
+          <div><label>قیمت فروش</label><input id="rPrice" type="number"></div>
+          <div><label>تعداد فروش ماهانه</label><input id="rSalesQty" type="number"></div>
+        </div>
+        <div class="actions"><button class="btn good" onclick="saveRecipe()">ذخیره رسپی</button></div>
+      </div>
+      <div class="card span7">
+        <div class="section-title"><h2>کتابچه دیجیتال رسپی</h2><input id="recipeSearch" placeholder="جست‌وجوی رسپی..." oninput="renderRecipeCards()" style="max-width:260px"></div>
+        <div id="recipeCards"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" data-page="ingredients">
+    <div class="card">
+      <h2>مواد اولیه و قیمت خرید</h2>
+      <div class="form">
+        <div><label>نام ماده</label><input id="iName" placeholder="دانه قهوه فول"></div>
+        <div><label>قیمت بسته</label><input id="iPrice" type="number"></div>
+        <div><label>مقدار بسته</label><input id="iPack" type="number" placeholder="۱۰۰۰"></div>
+        <div><label>واحد</label><select id="iUnit"><option>گرم</option><option>میلی‌لیتر</option><option>عدد</option></select></div>
+      </div>
+      <div class="actions"><button class="btn primary" onclick="addIngredient()">ثبت ماده اولیه</button></div>
+      <div class="table-wrap"><table id="ingredientsTable"></table></div>
+    </div>
+  </section>
+
+  <section class="page" data-page="operations">
+    <div class="grid">
+      <div class="card span6">
+        <h2>هزینه‌های ماهانه</h2>
+        <div class="form two">
+          <div><label>عنوان</label><input id="eName"></div>
+          <div><label>مبلغ</label><input id="eAmount" type="number"></div>
+          <div><label>نوع</label><select id="eType"><option>ثابت</option><option>متغیر</option></select></div>
+          <div><label>ثبت</label><button class="btn primary" onclick="addExpense()">ثبت هزینه</button></div>
+        </div>
+        <div class="table-wrap"><table id="expensesTable"></table></div>
+      </div>
+      <div class="card span6">
+        <h2>پرت و ضایعات</h2>
+        <div class="form two">
+          <div><label>ماده</label><select id="wIngredient"></select></div>
+          <div><label>مقدار پرت</label><input id="wQty" type="number"></div>
+          <div><label>توضیح</label><input id="wNote" placeholder="شات خراب / شیر دورریز"></div>
+          <div><label>ثبت</label><button class="btn primary" onclick="addWaste()">ثبت پرت</button></div>
+        </div>
+        <div class="table-wrap"><table id="wasteTable"></table></div>
+      </div>
+      <div class="card span12">
+        <h2>موجودی و پیشنهاد خرید</h2>
+        <div class="table-wrap"><table id="inventoryTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" data-page="analysis">
+    <div class="grid">
+      <div class="card span12"><h2>مهندسی منو</h2><div class="table-wrap"><table id="analysisTable"></table></div></div>
+      <div class="card span6"><h2>گزارش سود و زیان</h2><div id="pnlReport"></div></div>
+      <div class="card span6"><h2>سناریوی رسیدن به سود هدف</h2><div id="scenarioReport"></div></div>
+    </div>
+  </section>
 </main>
-<nav class="bottom" id="bottom"></nav>
+</div>
+
+<nav class="bottom-nav" id="bottomNav"></nav>
 <script src="./app.js"></script>
 </body>
 </html>
