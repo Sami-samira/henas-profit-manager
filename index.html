@@ -138,6 +138,29 @@
 .cloud-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cloud-user{font-size:11px;color:#aaa;max-width:200px;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:700px){.cloud-grid{grid-template-columns:1fr}.cloud-card{padding:16px}.jalali-selects{grid-template-columns:1fr}}
 
+
+.knowledge-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:13px}
+.knowledge-kpi{background:#151515;border:1px solid #393939;border-radius:16px;padding:14px}
+.knowledge-kpi small{color:#aaa}.knowledge-kpi strong{display:block;font-size:22px;margin-top:7px}
+.knowledge-card,.idea-card,.checklist-card{background:#141414;border:1px solid #373737;border-radius:16px;padding:14px;margin-bottom:10px}
+.knowledge-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.knowledge-meta{color:#aaa;font-size:12px;line-height:1.8;margin-top:5px}
+.knowledge-body{line-height:1.95;color:#d6d6d6;margin-top:10px;white-space:pre-wrap}
+.knowledge-source{background:#1d241d;border:1px solid #374a38;border-radius:12px;padding:9px;margin-top:10px;font-size:12px}
+.k-status-new{background:#4b3b24}.k-status-approved{background:#2d472f}.k-status-standard{background:#3d3155}.k-status-rejected{background:#4c2929}
+.idea-new{background:#343434}.idea-review{background:#4b3b24}.idea-test{background:#33475a}.idea-done{background:#2d472f}.idea-rejected{background:#4c2929}
+.check-row{display:grid;grid-template-columns:auto 1fr minmax(90px,150px) auto;gap:9px;align-items:center;background:#171717;border:1px solid #343434;border-radius:12px;padding:10px;margin-bottom:8px}
+.check-row input[type="checkbox"]{width:20px;height:20px}
+.check-row.done{opacity:.7;background:#182018}
+.check-value{min-width:85px}
+.attachment-note{font-size:11px;color:#999;line-height:1.8}
+.knowledge-tabs{display:flex;gap:7px;overflow:auto;margin-bottom:12px}
+.knowledge-tab{white-space:nowrap;border:1px solid #414141;background:#1d1d1d;color:#bbb;border-radius:999px;padding:8px 12px}
+.knowledge-tab.active{background:#33432e;color:#fff;border-color:#61745a}
+.idea-score{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.idea-score div{background:#1c1c1c;border:1px solid #333;border-radius:10px;padding:8px;text-align:center}
+@media(max-width:850px){.knowledge-kpis{grid-template-columns:1fr 1fr}.check-row{grid-template-columns:auto 1fr}.check-row .check-value,.check-row .btn{grid-column:2}}
+
 </style>
 </head>
 <body>
@@ -380,6 +403,145 @@
 
 
 
+
+
+<section class="page" data-page="knowledge">
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <h2>دانش و بهبود هناس</h2>
+        <p>تجربه‌های تیم را به سرمایه سازمانی تبدیل کنید، چک‌لیست‌های شیفت را کنترل کنید و پیشنهادهای باریستاها را از ایده تا اجرای آزمایشی پیش ببرید.</p>
+      </div>
+      <div class="hero-orb">✦</div>
+    </div>
+  </div>
+
+  <div class="knowledge-kpis">
+    <div class="knowledge-kpi"><small>دانش در انتظار بررسی</small><strong id="knowledgePendingKpi">۰</strong></div>
+    <div class="knowledge-kpi"><small>استانداردهای عملیاتی</small><strong id="knowledgeStandardKpi">۰</strong></div>
+    <div class="knowledge-kpi"><small>چک‌لیست ناقص امروز</small><strong id="checklistIncompleteKpi">۰</strong></div>
+    <div class="knowledge-kpi"><small>ایده‌های فعال</small><strong id="ideasActiveKpi">۰</strong></div>
+  </div>
+
+  <div class="knowledge-tabs">
+    <button class="knowledge-tab active" data-kview="library" onclick="setKnowledgeView('library')">کتابخانه دانش</button>
+    <button class="knowledge-tab" data-kview="new" onclick="setKnowledgeView('new')">ثبت تجربه جدید</button>
+    <button class="knowledge-tab" data-kview="checklists" onclick="setKnowledgeView('checklists')">چک‌لیست‌های امروز</button>
+    <button class="knowledge-tab" data-kview="ideas" onclick="setKnowledgeView('ideas')">ایده‌ها و پیشنهادها</button>
+    <button class="knowledge-tab" data-kview="manage" onclick="setKnowledgeView('manage')">مدیریت و استانداردسازی</button>
+  </div>
+
+  <div id="knowledgeViewLibrary" class="knowledge-view">
+    <div class="grid">
+      <div class="card span12">
+        <div class="section-title">
+          <h2>کتابخانه دانش تیم</h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input id="knowledgeSearch" placeholder="جست‌وجوی عنوان، متن، محصول یا ثبت‌کننده..." oninput="renderKnowledgeModule()" style="min-width:280px">
+            <select id="knowledgeCategoryFilter" onchange="renderKnowledgeModule()">
+              <option value="">همه دسته‌ها</option><option>رسپی</option><option>تجهیزات</option><option>مشتری</option><option>فروش</option><option>انبار</option><option>نظافت</option><option>عیب‌یابی</option><option>آموزش</option><option>سایر</option>
+            </select>
+          </div>
+        </div>
+        <div id="knowledgeLibrary"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="knowledgeViewNew" class="knowledge-view" style="display:none">
+    <div class="grid">
+      <div class="card span6">
+        <h2>ثبت تجربه و دانش جدید</h2>
+        <div class="form two">
+          <div><label>عنوان تجربه</label><input id="kTitle" placeholder="مثلاً علت خوابیدن فوم شیر"></div>
+          <div><label>دسته‌بندی</label><select id="kCategory"><option>رسپی</option><option>تجهیزات</option><option>مشتری</option><option>فروش</option><option>انبار</option><option>نظافت</option><option>عیب‌یابی</option><option>آموزش</option><option>سایر</option></select></div>
+          <div><label>محصول/دستگاه مرتبط</label><input id="kRelated" placeholder="لاته، آسیاب، دستگاه اسپرسو..."></div>
+          <div><label>اهمیت</label><select id="kPriority"><option value="normal">عادی</option><option value="important">مهم</option><option value="critical">بحرانی</option></select></div>
+          <div><label>نام ثبت‌کننده</label><input id="kAuthor" placeholder="نام پرسنل"></div>
+          <div><label>تاریخ</label><input id="kDate" type="date"></div>
+        </div>
+        <div><label>شرح تجربه</label><textarea id="kBody" placeholder="چه اتفاقی افتاد؟ چه چیزی یاد گرفتید؟ راه‌حل یا نکته عملی چیست؟"></textarea></div>
+        <div><label>نتیجه یا توصیه عملی</label><textarea id="kRecommendation" placeholder="این تجربه دقیقاً چه تغییری در کار ایجاد می‌کند؟"></textarea></div>
+        <div><label>منبع یا شواهد</label><input id="kEvidence" placeholder="مثلاً آزمون سه‌روزه، نظر مشتری، فاکتور، عکس یا رسپی مرتبط"></div>
+        <div class="actions"><button class="btn good" onclick="addKnowledgeItem()">ارسال برای بررسی</button></div>
+      </div>
+
+      <div class="card span6">
+        <h2>اصول ثبت دانش باکیفیت</h2>
+        <div class="insight low"><h4>مشاهده را از نتیجه جدا کنید</h4><p>ابتدا بنویسید چه چیزی دیده شد، سپس برداشت و راه‌حل را ثبت کنید.</p></div>
+        <div class="insight medium"><h4>قابل تکرار باشد</h4><p>مقدار، دما، زمان، شرایط دستگاه یا نوع ماده اولیه را دقیق بنویسید.</p></div>
+        <div class="insight medium"><h4>هر تجربه فوراً استاندارد نیست</h4><p>مدیر پس از بررسی می‌تواند آن را تأیید یا به استاندارد عملیاتی تبدیل کند.</p></div>
+        <div class="insight low"><h4>به رسپی یا تجهیز مرتبط شود</h4><p>این ارتباط باعث می‌شود دستیار باریستا هنگام پاسخ‌گویی از دانش تأییدشده استفاده کند.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="knowledgeViewChecklists" class="knowledge-view" style="display:none">
+    <div class="grid">
+      <div class="card span5">
+        <h2>ساخت چک‌لیست</h2>
+        <div class="form two">
+          <div><label>عنوان</label><input id="clTitle" placeholder="شروع شیفت صبح"></div>
+          <div><label>نوع</label><select id="clType"><option>شروع شیفت</option><option>حین شیفت</option><option>پایان شیفت</option><option>نظافت</option><option>کنترل تجهیزات</option><option>سفارشی</option></select></div>
+          <div><label>شیفت</label><select id="clShift"><option>همه</option><option>صبح</option><option>عصر</option><option>شب</option></select></div>
+          <div><label>نقش مسئول</label><input id="clRole" placeholder="باریستا / صندوق‌دار"></div>
+        </div>
+        <div><label>آیتم‌ها؛ هر مورد در یک خط</label><textarea id="clItems" placeholder="روشن‌کردن دستگاه اسپرسو&#10;بررسی دمای یخچال | عدد | 2 تا 6&#10;تست شات اولیه"></textarea></div>
+        <div class="attachment-note">برای آیتم عددی از الگوی «عنوان | عدد | محدوده» استفاده کنید؛ مثال: دمای یخچال | عدد | 2 تا 6</div>
+        <div class="actions"><button class="btn good" onclick="addChecklistTemplate()">ذخیره قالب چک‌لیست</button></div>
+      </div>
+      <div class="card span7">
+        <div class="section-title"><h2>چک‌لیست‌های امروز</h2><button class="btn" onclick="createTodayChecklists()">ایجاد از قالب‌ها</button></div>
+        <div id="todayChecklists"></div>
+      </div>
+      <div class="card span12">
+        <h2>قالب‌های تعریف‌شده</h2>
+        <div id="checklistTemplates"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="knowledgeViewIdeas" class="knowledge-view" style="display:none">
+    <div class="grid">
+      <div class="card span5">
+        <h2>ثبت ایده یا پیشنهاد</h2>
+        <div class="form two">
+          <div><label>عنوان ایده</label><input id="iTitle"></div>
+          <div><label>دسته</label><select id="iCategory"><option>محصول جدید</option><option>اصلاح رسپی</option><option>کاهش پرت</option><option>افزایش سرعت سرو</option><option>کمپین فروش</option><option>تجربه مشتری</option><option>فرآیند و شیفت</option><option>خرید تجهیزات</option><option>سایر</option></select></div>
+          <div><label>پیشنهاددهنده</label><input id="iAuthor"></div>
+          <div><label>اولویت پیشنهادی</label><select id="iPriority"><option>عادی</option><option>مهم</option><option>فوری</option></select></div>
+          <div><label>هزینه تقریبی</label><input id="iCost" type="number"></div>
+          <div><label>منفعت مالی احتمالی ماهانه</label><input id="iBenefit" type="number"></div>
+        </div>
+        <div><label>مشکل فعلی</label><textarea id="iProblem"></textarea></div>
+        <div><label>راه‌حل پیشنهادی</label><textarea id="iSolution"></textarea></div>
+        <div><label>معیار موفقیت آزمایش</label><input id="iSuccessMetric" placeholder="مثلاً افزایش ۱۵٪ فروش کمبو"></div>
+        <div class="actions"><button class="btn good" onclick="addTeamIdea()">ثبت پیشنهاد</button></div>
+      </div>
+      <div class="card span7">
+        <div class="section-title"><h2>پیشنهادهای تیم</h2><select id="ideaStatusFilter" onchange="renderKnowledgeModule()"><option value="">همه وضعیت‌ها</option><option value="new">جدید</option><option value="review">در حال بررسی</option><option value="test">آزمایش</option><option value="done">اجراشده</option><option value="rejected">ردشده</option></select></div>
+        <div id="teamIdeas"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="knowledgeViewManage" class="knowledge-view" style="display:none">
+    <div class="grid">
+      <div class="card span6">
+        <h2>صف بررسی دانش</h2>
+        <div id="knowledgeReviewQueue"></div>
+      </div>
+      <div class="card span6">
+        <h2>گزارش مشارکت تیم</h2>
+        <div id="knowledgeContributors"></div>
+      </div>
+      <div class="card span12">
+        <h2>هشدارهای بهبود مستمر</h2>
+        <div id="knowledgeInsights"></div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <section class="page" data-page="club">
   <div class="hero">

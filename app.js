@@ -32,6 +32,11 @@ db.customerVisits=Array.isArray(db.customerVisits)?db.customerVisits:[];
 db.preorders=Array.isArray(db.preorders)?db.preorders:[];
 db.cafeStatus=db.cafeStatus||{status:"open",openTime:"08:00",prepMinutes:10,message:"باز هستیم و منتظرتان هستیم."};
 db.clubSettings=db.clubSettings||{pointsPer100k:10};
+db.knowledgeItems=Array.isArray(db.knowledgeItems)?db.knowledgeItems:[];
+db.checklistTemplates=Array.isArray(db.checklistTemplates)?db.checklistTemplates:[];
+db.checklistRuns=Array.isArray(db.checklistRuns)?db.checklistRuns:[];
+db.teamIdeas=Array.isArray(db.teamIdeas)?db.teamIdeas:[];
+let activeKnowledgeView="library";
 let cloudMode=false,cloudSession=null,cloudWorkspace=null,cloudSaveTimer=null,cloudLoading=false;
 const CLOUD_SESSION_KEY="henas_cloud_session";
 const CLOUD_WORKSPACE_KEY="henas_cloud_workspace";
@@ -40,7 +45,7 @@ let activeRole=sessionStorage.getItem("henasRole")||"";
 let activeEmployeeId=Number(sessionStorage.getItem("henasEmployeeId")||0);
 let recipeDraft=[];
 let lastBotAnswer="";
-const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["club","باشگاه مشتریان"],["purchases","خرید و انبار"],["staff","پرسنل"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
+const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["knowledge","دانش و بهبود"],["club","باشگاه مشتریان"],["purchases","خرید و انبار"],["staff","پرسنل"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
 const $=id=>document.getElementById(id);
 function money(n){return Math.round(Number(n)||0).toLocaleString("fa-IR")+" تومان"}
 function num(n){return (Number(n)||0).toLocaleString("fa-IR",{maximumFractionDigits:1})}
@@ -229,7 +234,7 @@ function renderDashboard(m){
  const gap=db.settings.targetProfit-m.net,con=1-m.variableRate,extra=gap>0&&con>0?gap/con:0;$("extraSales").textContent=money(extra);$("extraDaily").textContent=money(extra/db.settings.workDays);
  const d=db.recipes.map(r=>({name:r.name,sales:r.price*r.salesQty,profit:(r.price-recipeCost(r))*r.salesQty}));renderChart("profitChart",d,"profit");renderChart("salesChart",d,"sales");
 }
-function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();renderPurchasesModule();renderClubModule();syncJalaliInputs();fillRoleGate()}
+function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();renderPurchasesModule();renderClubModule();renderKnowledgeModule();syncJalaliInputs();fillRoleGate()}
 
 
 
@@ -430,6 +435,139 @@ function applyJalaliDate(){
 function setJalaliToday(){const n=new Date(),j=d2j(g2d(n.getFullYear(),n.getMonth()+1,n.getDate()));$('jalaliYear').value=j.jy;$('jalaliMonth').value=j.jm;updateJalaliDays(j.jd)}
 function clearJalaliDate(){if(activeJalaliInput){activeJalaliInput.value='';activeJalaliInput.dispatchEvent(new Event('change',{bubbles:true}))}closeJalaliPicker();syncJalaliInputs()}
 function closeJalaliPicker(){$('jalaliModal').classList.remove('open')}
+
+
+// ================= Knowledge, Checklists & Team Ideas =================
+function setKnowledgeView(view){
+ activeKnowledgeView=view;
+ document.querySelectorAll('.knowledge-view').forEach(x=>x.style.display='none');
+ const map={library:'knowledgeViewLibrary',new:'knowledgeViewNew',checklists:'knowledgeViewChecklists',ideas:'knowledgeViewIdeas',manage:'knowledgeViewManage'};
+ if($(map[view]))$(map[view]).style.display='block';
+ document.querySelectorAll('.knowledge-tab').forEach(b=>b.classList.toggle('active',b.dataset.kview===view));
+ renderKnowledgeModule()
+}
+function knowledgeStatusLabel(s){return s==='approved'?'تأییدشده':s==='standard'?'استاندارد عملیاتی':s==='rejected'?'ردشده':'در انتظار بررسی'}
+function knowledgeStatusClass(s){return s==='approved'?'k-status-approved':s==='standard'?'k-status-standard':s==='rejected'?'k-status-rejected':'k-status-new'}
+function ideaStatusLabel(s){return s==='review'?'در حال بررسی':s==='test'?'در حال آزمایش':s==='done'?'اجراشده':s==='rejected'?'ردشده':'جدید'}
+function ideaStatusClass(s){return s==='review'?'idea-review':s==='test'?'idea-test':s==='done'?'idea-done':s==='rejected'?'idea-rejected':'idea-new'}
+function addKnowledgeItem(){
+ const title=$('kTitle').value.trim(),body=$('kBody').value.trim();
+ if(!title||!body)return alert('عنوان و شرح تجربه را وارد کنید.');
+ db.knowledgeItems.push({
+  id:uid(),title,body,category:$('kCategory').value,related:$('kRelated').value.trim(),
+  priority:$('kPriority').value,author:$('kAuthor').value.trim()||'نامشخص',
+  date:$('kDate').value||localISODate(),recommendation:$('kRecommendation').value.trim(),
+  evidence:$('kEvidence').value.trim(),status:'pending',managerNote:'',version:1,
+  createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()
+ });
+ ['kTitle','kBody','kRelated','kAuthor','kRecommendation','kEvidence'].forEach(id=>$(id).value='');
+ save();setKnowledgeView('library')
+}
+function updateKnowledgeStatus(id,status){
+ const k=db.knowledgeItems.find(x=>x.id===id);if(!k)return;
+ k.status=status;k.managerNote=prompt('یادداشت مدیر یا دلیل تصمیم: ',k.managerNote||'')||k.managerNote||'';
+ k.updatedAt=new Date().toISOString();k.version=(+k.version||1)+(status==='standard'?1:0);save()
+}
+function deleteKnowledgeItem(id){if(confirm('این دانش حذف شود؟')){db.knowledgeItems=db.knowledgeItems.filter(x=>x.id!==id);save()}}
+function knowledgeForAssistant(question){
+ const q=normalize(question);
+ return db.knowledgeItems.filter(k=>['approved','standard'].includes(k.status))
+  .map(k=>({k,score:[k.title,k.body,k.related,k.recommendation,k.category].reduce((s,v)=>s+(normalize(v||'').split(' ').filter(t=>t.length>2&&q.includes(t)).length),0)}))
+  .filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,3).map(x=>x.k)
+}
+const originalBaristaAnswer=typeof baristaAnswer==='function'?baristaAnswer:null;
+if(originalBaristaAnswer){
+ baristaAnswer=function(question){
+  const base=originalBaristaAnswer(question),items=knowledgeForAssistant(question);
+  if(!items.length)return base;
+  return base+'\n\nدانش تأییدشده تیم:\n'+items.map(k=>`• ${k.title}: ${k.recommendation||k.body}\n  منبع: ${k.author}، ${toJalali(k.date)}`).join('\n')
+ }
+}
+function parseChecklistLine(line){
+ const p=line.split('|').map(x=>x.trim());return{id:uid(),title:p[0],kind:(p[1]||'تیک')==='عدد'?'number':'check',range:p[2]||'',done:false,value:'',note:'',doneBy:'',doneAt:''}
+}
+function addChecklistTemplate(){
+ const title=$('clTitle').value.trim(),lines=$('clItems').value.split('\n').map(x=>x.trim()).filter(Boolean);
+ if(!title||!lines.length)return alert('عنوان و آیتم‌های چک‌لیست را وارد کنید.');
+ db.checklistTemplates.push({id:uid(),title,type:$('clType').value,shift:$('clShift').value,role:$('clRole').value.trim(),items:lines.map(parseChecklistLine),active:true,createdAt:new Date().toISOString()});
+ ['clTitle','clRole','clItems'].forEach(id=>$(id).value='');save()
+}
+function createTodayChecklists(){
+ const date=localISODate();let count=0;
+ db.checklistTemplates.filter(t=>t.active!==false).forEach(t=>{
+  if(db.checklistRuns.some(r=>r.templateId===t.id&&r.date===date))return;
+  db.checklistRuns.push({id:uid(),templateId:t.id,title:t.title,type:t.type,shift:t.shift,role:t.role,date,items:t.items.map(i=>({...i,id:uid(),done:false,value:'',note:'',doneBy:'',doneAt:''})),status:'open',createdAt:new Date().toISOString()});count++
+ });
+ save();if(!count)alert('چک‌لیست امروز قبلاً ساخته شده یا قالبی وجود ندارد.')
+}
+function toggleChecklistItem(runId,itemId,done){
+ const r=db.checklistRuns.find(x=>x.id===runId),i=r?.items.find(x=>x.id===itemId);if(!i)return;
+ i.done=done;i.doneAt=done?new Date().toISOString():'';i.doneBy=done?(prompt('نام انجام‌دهنده:',i.doneBy||'')||i.doneBy||'نامشخص'):'';
+ r.status=r.items.every(x=>x.done)?'complete':'open';save()
+}
+function updateChecklistValue(runId,itemId,value){
+ const r=db.checklistRuns.find(x=>x.id===runId),i=r?.items.find(x=>x.id===itemId);if(!i)return;i.value=value;save()
+}
+function deleteChecklistTemplate(id){if(confirm('قالب حذف شود؟')){db.checklistTemplates=db.checklistTemplates.filter(x=>x.id!==id);save()}}
+function closeChecklistRun(id){const r=db.checklistRuns.find(x=>x.id===id);if(r){r.status=r.items.every(x=>x.done)?'complete':'closed-incomplete';r.closedAt=new Date().toISOString();save()}}
+function addTeamIdea(){
+ const title=$('iTitle').value.trim(),solution=$('iSolution').value.trim();
+ if(!title||!solution)return alert('عنوان و راه‌حل پیشنهادی را وارد کنید.');
+ db.teamIdeas.push({id:uid(),title,category:$('iCategory').value,author:$('iAuthor').value.trim()||'نامشخص',priority:$('iPriority').value,cost:cleanNumber($('iCost').value),benefit:cleanNumber($('iBenefit').value),problem:$('iProblem').value.trim(),solution,successMetric:$('iSuccessMetric').value.trim(),status:'new',managerNote:'',testStart:'',testEnd:'',actualResult:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+ ['iTitle','iAuthor','iCost','iBenefit','iProblem','iSolution','iSuccessMetric'].forEach(id=>$(id).value='');save()
+}
+function updateIdeaStatus(id,status){
+ const i=db.teamIdeas.find(x=>x.id===id);if(!i)return;
+ i.status=status;i.managerNote=prompt('یادداشت مدیر / برنامه اقدام:',i.managerNote||'')||i.managerNote||'';
+ if(status==='test'){i.testStart=i.testStart||localISODate();i.testEnd=prompt('تاریخ پایان آزمایش به میلادی YYYY-MM-DD:',i.testEnd||'')||i.testEnd}
+ if(status==='done')i.actualResult=prompt('نتیجه واقعی اجرا:',i.actualResult||'')||i.actualResult;
+ i.updatedAt=new Date().toISOString();save()
+}
+function deleteTeamIdea(id){if(confirm('پیشنهاد حذف شود؟')){db.teamIdeas=db.teamIdeas.filter(x=>x.id!==id);save()}}
+function contributorStats(){
+ const map={};
+ db.knowledgeItems.forEach(k=>{map[k.author]=map[k.author]||{name:k.author,knowledge:0,approved:0,standard:0,ideas:0,doneIdeas:0};map[k.author].knowledge++;if(k.status==='approved')map[k.author].approved++;if(k.status==='standard')map[k.author].standard++});
+ db.teamIdeas.forEach(i=>{map[i.author]=map[i.author]||{name:i.author,knowledge:0,approved:0,standard:0,ideas:0,doneIdeas:0};map[i.author].ideas++;if(i.status==='done')map[i.author].doneIdeas++});
+ return Object.values(map).map(x=>({...x,score:x.approved*10+x.standard*30+x.doneIdeas*50})).sort((a,b)=>b.score-a.score)
+}
+function renderKnowledgeModule(){
+ if(!$('knowledgePendingKpi'))return;
+ if(!$('kDate').value)$('kDate').value=localISODate();
+ const today=localISODate();
+ const pending=db.knowledgeItems.filter(k=>k.status==='pending').length;
+ const standard=db.knowledgeItems.filter(k=>k.status==='standard').length;
+ const todayRuns=db.checklistRuns.filter(r=>r.date===today);
+ const incomplete=todayRuns.filter(r=>!r.items.every(i=>i.done)).length;
+ const activeIdeas=db.teamIdeas.filter(i=>!['done','rejected'].includes(i.status)).length;
+ $('knowledgePendingKpi').textContent=num(pending);$('knowledgeStandardKpi').textContent=num(standard);$('checklistIncompleteKpi').textContent=num(incomplete);$('ideasActiveKpi').textContent=num(activeIdeas);
+
+ const q=normalize($('knowledgeSearch')?.value||''),cat=$('knowledgeCategoryFilter')?.value||'';
+ const library=db.knowledgeItems.filter(k=>k.status!=='rejected'&&(!cat||k.category===cat)&&(!q||[k.title,k.body,k.related,k.author,k.recommendation].some(v=>normalize(v||'').includes(q)))).sort((a,b)=>(b.updatedAt||b.createdAt).localeCompare(a.updatedAt||a.createdAt));
+ $('knowledgeLibrary').innerHTML=library.length?library.map(k=>`<div class="knowledge-card"><div class="knowledge-head"><div><h3 style="margin:0">${esc(k.title)}</h3><div class="knowledge-meta">${esc(k.category)} | ${esc(k.related||'بدون ارتباط')} | ثبت‌کننده: ${esc(k.author)} | ${toJalali(k.date)} | نسخه ${num(k.version||1)}</div></div><span class="chip ${knowledgeStatusClass(k.status)}">${knowledgeStatusLabel(k.status)}</span></div><div class="knowledge-body">${esc(k.body)}</div>${k.recommendation?`<div class="knowledge-source"><strong>توصیه عملی:</strong> ${esc(k.recommendation)}</div>`:''}${k.evidence?`<div class="knowledge-meta">شواهد: ${esc(k.evidence)}</div>`:''}</div>`).join(''):'<div class="empty">دانشی ثبت نشده است.</div>';
+
+ const runs=todayRuns.sort((a,b)=>a.title.localeCompare(b.title));
+ $('todayChecklists').innerHTML=runs.length?runs.map(r=>`<div class="checklist-card"><div class="knowledge-head"><div><strong>${esc(r.title)}</strong><div class="knowledge-meta">${esc(r.type)} | شیفت ${esc(r.shift)} | مسئول ${esc(r.role||'-')}</div></div><span class="chip ${r.items.every(i=>i.done)?'k-status-approved':'k-status-new'}">${r.items.filter(i=>i.done).length}/${r.items.length}</span></div><div style="margin-top:10px">${r.items.map(i=>`<div class="check-row ${i.done?'done':''}"><input type="checkbox" ${i.done?'checked':''} onchange="toggleChecklistItem(${r.id},${i.id},this.checked)"><div><strong>${esc(i.title)}</strong>${i.range?`<div class="knowledge-meta">محدوده مجاز: ${esc(i.range)}</div>`:''}${i.doneBy?`<div class="knowledge-meta">انجام‌دهنده: ${esc(i.doneBy)}</div>`:''}</div>${i.kind==='number'?`<input class="check-value" type="number" value="${esc(i.value||'')}" placeholder="مقدار" onchange="updateChecklistValue(${r.id},${i.id},this.value)">`:'<span></span>'}<button class="btn" onclick="toggleChecklistItem(${r.id},${i.id},true)">انجام شد</button></div>`).join('')}</div><div class="actions"><button class="btn" onclick="closeChecklistRun(${r.id})">بستن چک‌لیست</button></div></div>`).join(''):'<div class="empty">چک‌لیست امروز ساخته نشده است.</div>';
+
+ $('checklistTemplates').innerHTML=db.checklistTemplates.length?db.checklistTemplates.map(t=>`<div class="checklist-card"><div class="knowledge-head"><div><strong>${esc(t.title)}</strong><div class="knowledge-meta">${esc(t.type)} | شیفت ${esc(t.shift)} | ${num(t.items.length)} آیتم</div></div><button class="btn danger" onclick="deleteChecklistTemplate(${t.id})">حذف</button></div></div>`).join(''):'<div class="empty">قالبی تعریف نشده است.</div>';
+
+ const sf=$('ideaStatusFilter')?.value||'';
+ const ideas=db.teamIdeas.filter(i=>!sf||i.status===sf).sort((a,b)=>(b.updatedAt||b.createdAt).localeCompare(a.updatedAt||a.createdAt));
+ $('teamIdeas').innerHTML=ideas.length?ideas.map(i=>`<div class="idea-card"><div class="knowledge-head"><div><h3 style="margin:0">${esc(i.title)}</h3><div class="knowledge-meta">${esc(i.category)} | پیشنهاددهنده: ${esc(i.author)} | اولویت ${esc(i.priority)}</div></div><span class="chip ${ideaStatusClass(i.status)}">${ideaStatusLabel(i.status)}</span></div><div class="knowledge-body"><strong>مشکل:</strong> ${esc(i.problem||'-')}<br><strong>راه‌حل:</strong> ${esc(i.solution)}</div><div class="idea-score"><div><small>هزینه</small><strong>${money(i.cost||0)}</strong></div><div><small>منفعت احتمالی</small><strong>${money(i.benefit||0)}</strong></div><div><small>بازده تقریبی</small><strong>${i.cost>0?num(i.benefit/i.cost):'-'}×</strong></div></div>${i.successMetric?`<div class="knowledge-source">معیار موفقیت: ${esc(i.successMetric)}</div>`:''}${i.managerNote?`<div class="knowledge-meta">یادداشت مدیر: ${esc(i.managerNote)}</div>`:''}<div class="actions"><button class="btn" onclick="updateIdeaStatus(${i.id},'review')">بررسی</button><button class="btn warn" onclick="updateIdeaStatus(${i.id},'test')">آزمایش</button><button class="btn good" onclick="updateIdeaStatus(${i.id},'done')">اجرا شد</button><button class="btn danger" onclick="updateIdeaStatus(${i.id},'rejected')">رد</button></div></div>`).join(''):'<div class="empty">پیشنهادی ثبت نشده است.</div>';
+
+ const queue=db.knowledgeItems.filter(k=>k.status==='pending').sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+ $('knowledgeReviewQueue').innerHTML=queue.length?queue.map(k=>`<div class="knowledge-card"><strong>${esc(k.title)}</strong><div class="knowledge-meta">${esc(k.author)} | ${esc(k.category)} | ${toJalali(k.date)}</div><div class="knowledge-body">${esc(k.body)}</div><div class="actions"><button class="btn good" onclick="updateKnowledgeStatus(${k.id},'approved')">تأیید دانش</button><button class="btn primary" onclick="updateKnowledgeStatus(${k.id},'standard')">تبدیل به استاندارد</button><button class="btn danger" onclick="updateKnowledgeStatus(${k.id},'rejected')">رد</button></div></div>`).join(''):'<div class="empty">موردی در انتظار بررسی نیست.</div>';
+
+ const contributors=contributorStats();
+ $('knowledgeContributors').innerHTML=contributors.length?contributors.map((c,idx)=>`<div class="customer-card"><div class="customer-head"><div><strong>${idx+1}. ${esc(c.name)}</strong><div class="customer-meta">${num(c.knowledge)} دانش | ${num(c.standard)} استاندارد | ${num(c.ideas)} ایده | ${num(c.doneIdeas)} ایده اجراشده</div></div><span class="chip good">${num(c.score)} امتیاز</span></div></div>`).join(''):'<div class="empty">مشارکتی ثبت نشده است.</div>';
+
+ const insights=[];
+ const repeated={};db.knowledgeItems.filter(k=>k.status!=='rejected').forEach(k=>{const key=normalize(k.related||k.category);if(key)repeated[key]=(repeated[key]||0)+1});
+ Object.entries(repeated).filter(([,n])=>n>=3).sort((a,b)=>b[1]-a[1]).slice(0,4).forEach(([key,n])=>insights.push({level:'medium',title:`موضوع تکرارشونده: ${key}`,text:`این موضوع ${n} بار در دانش تیم ثبت شده است؛ آموزش، اصلاح رسپی یا بررسی تجهیز پیشنهاد می‌شود.`,impact:'نیازمند اقدام ریشه‌ای'}));
+ if(incomplete)insights.push({level:'high',title:`${incomplete} چک‌لیست امروز ناقص است`,text:'موارد انجام‌نشده را قبل از پایان شیفت بررسی و مسئول آن را مشخص کنید.',impact:'ریسک عملیاتی'});
+ const testIdeas=db.teamIdeas.filter(i=>i.status==='test').length;if(testIdeas)insights.push({level:'low',title:`${testIdeas} ایده در حال آزمایش`,text:'نتیجه فروش، سود، زمان سرو و بازخورد مشتری را در پایان دوره ثبت کنید.',impact:'تصمیم مبتنی بر داده'});
+ if(!insights.length)insights.push({level:'low',title:'وضعیت دانش و بهبود مناسب است',text:'تیم را به ثبت تجربه‌های دقیق و پیشنهادهای قابل‌آزمایش تشویق کنید.',impact:'بهبود مستمر'});
+ $('knowledgeInsights').innerHTML=insights.map(x=>`<div class="insight ${x.level}"><h4>${esc(x.title)}</h4><p>${x.text}</p><p class="impact">${x.impact}</p></div>`).join('');
+}
 
 // ================= Henas Customer Club =================
 function normalizePhone(v){return String(v||'').replace(/\D/g,'').replace(/^98/,'0')}
