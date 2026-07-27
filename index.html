@@ -127,9 +127,84 @@
 .consent-note{font-size:11px;color:#999;line-height:1.8}
 @media(max-width:850px){.club-kpis{grid-template-columns:1fr 1fr}}
 
+
+.cloud-gate{position:fixed;inset:0;background:rgba(5,5,5,.97);z-index:160;display:flex;align-items:center;justify-content:center;padding:18px}
+.cloud-gate.hidden{display:none}.cloud-card{width:min(900px,100%);max-height:94vh;overflow:auto;background:#1b1b1b;border:1px solid #4b4b4b;border-radius:24px;padding:22px;box-shadow:0 28px 80px rgba(0,0,0,.5)}
+.cloud-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.cloud-status{display:flex;align-items:center;gap:8px;font-size:12px;color:#aaa}.sync-dot{width:9px;height:9px;border-radius:50%;background:#777}.sync-dot.ok{background:#79a66f}.sync-dot.wait{background:#c7984e}.sync-dot.error{background:#c85f5f}
+.workspace-card{background:#141414;border:1px solid #393939;border-radius:15px;padding:14px;margin-bottom:9px}
+.jalali-visible{cursor:pointer;background:#121212!important}.jalali-hidden{display:none!important}
+.jalali-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:220;align-items:center;justify-content:center;padding:18px}.jalali-modal.open{display:flex}
+.jalali-card{width:min(440px,100%);background:#202020;border:1px solid #555;border-radius:20px;padding:18px}.jalali-selects{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}
+.cloud-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cloud-user{font-size:11px;color:#aaa;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:700px){.cloud-grid{grid-template-columns:1fr}.cloud-card{padding:16px}.jalali-selects{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
+
+<div class="cloud-gate" id="cloudGate">
+  <div class="cloud-card">
+    <div class="brand"><div class="logo">H</div><div><h1 style="margin:0">Henas Cafe OS Cloud</h1><small>ورود امن و همگام‌سازی چنددستگاهی</small></div></div>
+    <div id="cloudConfigPanel" style="margin-top:16px">
+      <div class="insight medium"><h4>تنظیم اولیه دیتابیس</h4><p>پس از ساخت پروژه Supabase، Project URL و Publishable/Anon Key را وارد کنید. کلید Secret یا Service Role را هرگز اینجا قرار ندهید.</p></div>
+      <div class="form two">
+        <div><label>Supabase Project URL</label><input id="cloudUrl" placeholder="https://xxxx.supabase.co"></div>
+        <div><label>Publishable / Anon Key</label><input id="cloudKey" type="password" placeholder="sb_publishable_... یا anon key"></div>
+      </div>
+      <div class="actions"><button class="btn good" onclick="saveCloudConfig()">ذخیره اتصال</button><button class="btn" onclick="useLocalDemo()">حالت آزمایشی محلی</button></div>
+    </div>
+
+    <div id="cloudAuthPanel" style="display:none;margin-top:16px">
+      <div class="cloud-grid">
+        <div class="role-option">
+          <span class="role-badge">ورود</span><h3>ورود به حساب</h3>
+          <input id="cloudLoginEmail" type="email" placeholder="ایمیل">
+          <input id="cloudLoginPassword" type="password" placeholder="رمز عبور" style="margin-top:8px">
+          <button class="btn good" style="width:100%;margin-top:10px" onclick="cloudSignIn()">ورود</button>
+        </div>
+        <div class="role-option">
+          <span class="role-badge">ثبت‌نام</span><h3>ساخت حساب جدید</h3>
+          <input id="cloudSignupEmail" type="email" placeholder="ایمیل">
+          <input id="cloudSignupPassword" type="password" placeholder="حداقل ۶ کاراکتر" style="margin-top:8px">
+          <button class="btn primary" style="width:100%;margin-top:10px" onclick="cloudSignUp()">ثبت‌نام</button>
+        </div>
+      </div>
+      <div class="actions"><button class="btn" onclick="resetCloudConfig()">تغییر تنظیم اتصال</button></div>
+    </div>
+
+    <div id="workspacePanel" style="display:none;margin-top:16px">
+      <div class="cloud-grid">
+        <div class="role-option">
+          <h3>ساخت فضای کافه</h3>
+          <input id="workspaceName" value="کافه هناس" placeholder="نام کافه">
+          <button class="btn good" style="width:100%;margin-top:10px" onclick="createCloudWorkspace()">ساخت فضای کاری</button>
+        </div>
+        <div class="role-option">
+          <h3>عضویت در فضای موجود</h3>
+          <input id="workspaceJoinCode" placeholder="کد عضویت مدیر">
+          <select id="workspaceJoinRole" style="margin-top:8px"><option value="staff">پرسنل</option><option value="manager">مدیر</option></select>
+          <button class="btn primary" style="width:100%;margin-top:10px" onclick="joinCloudWorkspace()">عضویت</button>
+        </div>
+      </div>
+      <h3>فضاهای در دسترس</h3><div id="workspaceList"></div>
+      <div class="actions"><button class="btn danger" onclick="cloudSignOut()">خروج از حساب</button></div>
+    </div>
+    <div id="cloudGateMessage" style="margin-top:10px;color:#e1b36d"></div>
+  </div>
+</div>
+
+<div class="jalali-modal" id="jalaliModal">
+  <div class="jalali-card">
+    <div class="section-title"><h2>انتخاب تاریخ شمسی</h2><button class="btn" onclick="closeJalaliPicker()">×</button></div>
+    <div class="jalali-selects">
+      <div><label>روز</label><select id="jalaliDay"></select></div>
+      <div><label>ماه</label><select id="jalaliMonth"></select></div>
+      <div><label>سال</label><select id="jalaliYear"></select></div>
+    </div>
+    <div class="actions"><button class="btn good" onclick="applyJalaliDate()">انتخاب</button><button class="btn" onclick="setJalaliToday()">امروز</button><button class="btn danger" onclick="clearJalaliDate()">پاک‌کردن</button></div>
+  </div>
+</div>
+
 
 <div class="role-gate" id="roleGate">
   <div class="role-card">
@@ -162,6 +237,11 @@
     <div><h1>Henas Cafe OS</h1><small>سیستم مدیریت هوشمند کافه هناس</small></div>
   </div>
   <div class="header-actions">
+    <div class="cloud-toolbar">
+      <div class="cloud-status"><span id="syncDot" class="sync-dot"></span><span id="syncLabel">محلی</span></div>
+      <span id="cloudUserLabel" class="cloud-user"></span>
+      <button class="btn desktop-only" onclick="openCloudWorkspaceSwitcher()">فضای کاری</button>
+    </div>
     <button class="btn" id="installBtn" hidden>نصب</button>
     <button class="btn desktop-only" onclick="exportData()">پشتیبان</button>
   </div>
@@ -726,6 +806,7 @@
 <nav class="bottom-nav" id="bottomNav"></nav>
 <script src="https://unpkg.com/mammoth@1.12.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="./cloud-config.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

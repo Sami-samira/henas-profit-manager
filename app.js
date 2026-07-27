@@ -32,6 +32,9 @@ db.customerVisits=Array.isArray(db.customerVisits)?db.customerVisits:[];
 db.preorders=Array.isArray(db.preorders)?db.preorders:[];
 db.cafeStatus=db.cafeStatus||{status:"open",openTime:"08:00",prepMinutes:10,message:"باز هستیم و منتظرتان هستیم."};
 db.clubSettings=db.clubSettings||{pointsPer100k:10};
+let cloudMode=false,cloudSession=null,cloudWorkspace=null,cloudSaveTimer=null,cloudLoading=false;
+const CLOUD_SESSION_KEY="henas_cloud_session";
+const CLOUD_WORKSPACE_KEY="henas_cloud_workspace";
 db.appSecurity=db.appSecurity||{managerPin:"1403"};
 let activeRole=sessionStorage.getItem("henasRole")||"";
 let activeEmployeeId=Number(sessionStorage.getItem("henasEmployeeId")||0);
@@ -42,7 +45,11 @@ const $=id=>document.getElementById(id);
 function money(n){return Math.round(Number(n)||0).toLocaleString("fa-IR")+" تومان"}
 function num(n){return (Number(n)||0).toLocaleString("fa-IR",{maximumFractionDigits:1})}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function save(){localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
+function save(){
+ localStorage.setItem(KEY,JSON.stringify(db));
+ renderAll();
+ if(cloudMode&&cloudSession&&cloudWorkspace&&!cloudLoading)scheduleCloudSave()
+}
 function uid(){return Date.now()+Math.random()}
 function unitCost(i){return i?.pack?i.price/i.pack:0}
 
@@ -222,12 +229,207 @@ function renderDashboard(m){
  const gap=db.settings.targetProfit-m.net,con=1-m.variableRate,extra=gap>0&&con>0?gap/con:0;$("extraSales").textContent=money(extra);$("extraDaily").textContent=money(extra/db.settings.workDays);
  const d=db.recipes.map(r=>({name:r.name,sales:r.price*r.salesQty,profit:(r.price-recipeCost(r))*r.salesQty}));renderChart("profitChart",d,"profit");renderChart("salesChart",d,"sales");
 }
-function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();renderPurchasesModule();renderClubModule();fillRoleGate()}
+function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();renderPurchasesModule();renderClubModule();syncJalaliInputs();fillRoleGate()}
 
 
 
 
 
+
+
+// ================= Supabase cloud persistence (REST + Auth) =================
+function cloudConfig(){
+ const saved=JSON.parse(localStorage.getItem('henas_cloud_config')||'null');
+ const fallback=window.HENAS_CLOUD_CONFIG||{};
+ return{url:(saved?.url||fallback.url||'').replace(/\/$/,''),key:saved?.key||fallback.key||''}
+}
+function saveCloudConfig(){
+ const url=$('cloudUrl').value.trim().replace(/\/$/,''),key=$('cloudKey').value.trim();
+ if(!/^https:\/\/.+\.supabase\.co$/.test(url)||!key)return cloudMessage('آدرس یا کلید صحیح نیست.');
+ localStorage.setItem('henas_cloud_config',JSON.stringify({url,key}));showCloudAuth()
+}
+function resetCloudConfig(){localStorage.removeItem('henas_cloud_config');localStorage.removeItem(CLOUD_SESSION_KEY);location.reload()}
+function useLocalDemo(){cloudMode=false;sessionStorage.setItem('henas_local_demo','1');$('cloudGate').classList.add('hidden');$('roleGate')?.classList.remove('hidden');setSyncStatus('محلی','')}
+function cloudMessage(t){$('cloudGateMessage').textContent=t||''}
+function authHeaders(accessToken=''){
+ const c=cloudConfig(),h={'apikey':c.key,'Content-Type':'application/json'};
+ if(accessToken)h.Authorization='Bearer '+accessToken;
+ return h
+}
+async function cloudFetch(path,opts={}){
+ const c=cloudConfig();if(!c.url||!c.key)throw new Error('تنظیم اتصال کامل نیست.');
+ const res=await fetch(c.url+path,{...opts,headers:{...authHeaders(opts.accessToken),...(opts.headers||{})}});
+ const text=await res.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
+ if(!res.ok)throw new Error(data?.msg||data?.message||data?.error_description||data?.hint||`خطای ${res.status}`);
+ return{data,res}
+}
+function persistCloudSession(data){
+ cloudSession={access_token:data.access_token,refresh_token:data.refresh_token,user:data.user,expires_at:Date.now()+(data.expires_in||3600)*1000};
+ localStorage.setItem(CLOUD_SESSION_KEY,JSON.stringify(cloudSession))
+}
+async function cloudSignUp(){
+ try{
+  cloudMessage('در حال ثبت‌نام...');
+  const {data}=await cloudFetch('/auth/v1/signup',{method:'POST',body:JSON.stringify({email:$('cloudSignupEmail').value.trim(),password:$('cloudSignupPassword').value})});
+  if(data.access_token){persistCloudSession(data);await showWorkspacePanel()}else cloudMessage('ثبت‌نام انجام شد. ایمیل تأیید را بررسی و سپس وارد شوید.')
+ }catch(e){cloudMessage(e.message)}
+}
+async function cloudSignIn(){
+ try{
+  cloudMessage('در حال ورود...');
+  const {data}=await cloudFetch('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:$('cloudLoginEmail').value.trim(),password:$('cloudLoginPassword').value})});
+  persistCloudSession(data);await showWorkspacePanel()
+ }catch(e){cloudMessage(e.message)}
+}
+async function refreshCloudSession(){
+ if(!cloudSession?.refresh_token)return false;
+ try{
+  const {data}=await cloudFetch('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:cloudSession.refresh_token})});
+  persistCloudSession(data);return true
+ }catch{return false}
+}
+async function ensureCloudSession(){
+ if(!cloudSession)return false;
+ if(cloudSession.expires_at-Date.now()<120000)return await refreshCloudSession();
+ return true
+}
+async function cloudSignOut(){
+ try{if(cloudSession)await cloudFetch('/auth/v1/logout',{method:'POST',accessToken:cloudSession.access_token})}catch{}
+ localStorage.removeItem(CLOUD_SESSION_KEY);localStorage.removeItem(CLOUD_WORKSPACE_KEY);cloudSession=null;cloudWorkspace=null;location.reload()
+}
+function showCloudAuth(){
+ $('cloudConfigPanel').style.display='none';$('cloudAuthPanel').style.display='block';$('workspacePanel').style.display='none';cloudMessage('')
+}
+async function getMyWorkspaces(){
+ await ensureCloudSession();
+ const {data}=await cloudFetch('/rest/v1/workspace_members?select=workspace_id,role,workspaces(id,name,join_code,created_at)&order=created_at.desc',{accessToken:cloudSession.access_token});
+ return data||[]
+}
+async function showWorkspacePanel(){
+ $('cloudConfigPanel').style.display='none';$('cloudAuthPanel').style.display='none';$('workspacePanel').style.display='block';
+ const rows=await getMyWorkspaces();
+ $('workspaceList').innerHTML=rows.length?rows.map(r=>`<div class="workspace-card"><div class="section-title"><div><strong>${esc(r.workspaces?.name||'فضای کاری')}</strong><div class="customer-meta">نقش: ${r.role} | کد عضویت: ${esc(r.workspaces?.join_code||'-')}</div></div><button class="btn good" onclick="selectCloudWorkspace('${r.workspace_id}')">انتخاب</button></div></div>`).join(''):'<div class="empty">فضای کاری ندارید.</div>';
+ cloudMessage('')
+}
+async function createCloudWorkspace(){
+ try{
+  const {data}=await cloudFetch('/rest/v1/rpc/create_workspace',{method:'POST',accessToken:cloudSession.access_token,body:JSON.stringify({p_name:$('workspaceName').value.trim()||'کافه هناس'})});
+  await selectCloudWorkspace(typeof data==='string'?data:data?.id||data)
+ }catch(e){cloudMessage(e.message)}
+}
+async function joinCloudWorkspace(){
+ try{
+  const {data}=await cloudFetch('/rest/v1/rpc/join_workspace',{method:'POST',accessToken:cloudSession.access_token,body:JSON.stringify({p_join_code:$('workspaceJoinCode').value.trim().toUpperCase(),p_role:$('workspaceJoinRole').value})});
+  await selectCloudWorkspace(typeof data==='string'?data:data?.id||data)
+ }catch(e){cloudMessage(e.message)}
+}
+async function selectCloudWorkspace(id){
+ try{
+  await ensureCloudSession();
+  const {data}=await cloudFetch(`/rest/v1/workspace_members?workspace_id=eq.${encodeURIComponent(id)}&select=workspace_id,role,workspaces(id,name,join_code)&limit=1`,{accessToken:cloudSession.access_token});
+  if(!data?.length)throw new Error('دسترسی به فضای کاری پیدا نشد.');
+  cloudWorkspace={id:data[0].workspace_id,role:data[0].role,name:data[0].workspaces?.name,join_code:data[0].workspaces?.join_code};
+  localStorage.setItem(CLOUD_WORKSPACE_KEY,JSON.stringify(cloudWorkspace));
+  await loadCloudState();
+  cloudMode=true;$('cloudGate').classList.add('hidden');$('roleGate')?.classList.remove('hidden');
+  setSyncStatus('همگام','ok');$('cloudUserLabel').textContent=`${cloudSession.user?.email||''} | ${cloudWorkspace.name||''}`;
+ }catch(e){cloudMessage(e.message)}
+}
+async function loadCloudState(){
+ cloudLoading=true;setSyncStatus('دریافت داده...','wait');
+ try{
+  const {data}=await cloudFetch(`/rest/v1/workspace_state?workspace_id=eq.${encodeURIComponent(cloudWorkspace.id)}&select=data,version,updated_at&limit=1`,{accessToken:cloudSession.access_token});
+  if(data?.[0]?.data&&Object.keys(data[0].data).length){
+   db={...seed,...data[0].data};
+   localStorage.setItem(KEY,JSON.stringify(db))
+  }else await saveCloudState();
+  renderAll();setSyncStatus('همگام','ok')
+ }finally{cloudLoading=false}
+}
+function scheduleCloudSave(){
+ clearTimeout(cloudSaveTimer);setSyncStatus('در انتظار ذخیره','wait');
+ cloudSaveTimer=setTimeout(saveCloudState,900)
+}
+async function saveCloudState(){
+ if(!cloudMode||!cloudSession||!cloudWorkspace)return;
+ try{
+  await ensureCloudSession();setSyncStatus('ذخیره...','wait');
+  await cloudFetch('/rest/v1/workspace_state?on_conflict=workspace_id',{method:'POST',accessToken:cloudSession.access_token,headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({workspace_id:cloudWorkspace.id,data:db,updated_at:new Date().toISOString()})});
+  setSyncStatus('همگام','ok')
+ }catch(e){setSyncStatus('خطای همگام‌سازی','error');console.error(e)}
+}
+function setSyncStatus(label,cls){if(!$('syncLabel'))return;$('syncLabel').textContent=label;$('syncDot').className='sync-dot '+(cls||'')}
+function openCloudWorkspaceSwitcher(){$('cloudGate').classList.remove('hidden');if(cloudSession)showWorkspacePanel();else showCloudAuth()}
+async function initCloud(){
+ const cfg=cloudConfig();$('cloudUrl').value=cfg.url||'';$('cloudKey').value=cfg.key||'';
+ if(sessionStorage.getItem('henas_local_demo')==='1'){useLocalDemo();return}
+ if(!cfg.url||!cfg.key){$('cloudConfigPanel').style.display='block';return}
+ cloudSession=JSON.parse(localStorage.getItem(CLOUD_SESSION_KEY)||'null');
+ if(!cloudSession){showCloudAuth();return}
+ if(!await ensureCloudSession()){showCloudAuth();return}
+ const saved=JSON.parse(localStorage.getItem(CLOUD_WORKSPACE_KEY)||'null');
+ if(saved?.id){cloudWorkspace=saved;await selectCloudWorkspace(saved.id)}
+ else await showWorkspacePanel()
+}
+
+// ================= Jalali date conversion and picker =================
+function div(a,b){return ~~(a/b)}
+function mod(a,b){return a-~~(a/b)*b}
+function jalCal(jy){
+ const breaks=[-61,9,38,199,426,686,756,818,1111,1181,1210,1635,2060,2097,2192,2262,2324,2394,2456,3178];
+ let bl=breaks.length,gy=jy+621,leapJ=-14,jp=breaks[0],jm,jump,leap,n,i;
+ if(jy<jp||jy>=breaks[bl-1])throw Error('Invalid Jalaali year');
+ for(i=1;i<bl;i++){jm=breaks[i];jump=jm-jp;if(jy<jm)break;leapJ+=div(jump,33)*8+div(mod(jump,33),4);jp=jm}
+ n=jy-jp;leapJ+=div(n,33)*8+div(mod(n,33)+3,4);if(mod(jump,33)===4&&jump-n===4)leapJ++;
+ const leapG=div(gy,4)-div((div(gy,100)+1)*3,4)-150, march=20+leapJ-leapG;
+ if(jump-n<6)n=n-jump+div(jump+4,33)*33;
+ leap=mod(mod(n+1,33)-1,4);if(leap===-1)leap=4;
+ return{leap,gy,march}
+}
+function g2d(gy,gm,gd){let d=div((gy+div(gm-8,6)+100100)*1461,4)+div(153*mod(gm+9,12)+2,5)+gd-34840408;d=d-div(div(gy+100100+div(gm-8,6),100)*3,4)+752;return d}
+function d2g(jdn){let j=4*jdn+139361631;j=j+div(div(4*jdn+183187720,146097)*3,4)*4-3908;let i=div(mod(j,1461),4)*5+308;let gd=div(mod(i,153),5)+1,gm=mod(div(i,153),12)+1,gy=div(j,1461)-100100+div(8-gm,6);return{gy,gm,gd}}
+function j2d(jy,jm,jd){const r=jalCal(jy);return g2d(r.gy,3,r.march)+(jm-1)*31-div(jm,7)*(jm-7)+jd-1}
+function d2j(jdn){const g=d2g(jdn),jy=g.gy-621,r=jalCal(jy),jdn1f=g2d(g.gy,3,r.march);let k=jdn-jdn1f,jm,jd,jy2=jy;if(k>=0){if(k<=185){jm=1+div(k,31);jd=mod(k,31)+1;return{jy:jy2,jm,jd}}k-=186}else{jy2--;k+=179;if(r.leap===1)k++;}jm=7+div(k,30);jd=mod(k,30)+1;return{jy:jy2,jm,jd}}
+function toJalali(iso){
+ if(!iso)return'';const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return iso;
+ const j=d2j(g2d(+m[1],+m[2],+m[3]));return`${j.jy}/${String(j.jm).padStart(2,'0')}/${String(j.jd).padStart(2,'0')}`
+}
+function toGregorian(jalali){
+ const m=String(jalali).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);if(!m)return'';
+ try{const g=d2g(j2d(+m[1],+m[2],+m[3]));return`${g.gy}-${String(g.gm).padStart(2,'0')}-${String(g.gd).padStart(2,'0')}`}catch{return''}
+}
+const jalaliMonths=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+let activeJalaliInput=null,activeJalaliMode='date';
+function initJalaliInputs(){
+ document.querySelectorAll('input[type="date"],input[type="month"]').forEach(hidden=>{
+  if(hidden.dataset.jalaliReady)return;hidden.dataset.jalaliReady='1';hidden.classList.add('jalali-hidden');
+  const visible=document.createElement('input');visible.type='text';visible.className='jalali-visible';visible.placeholder=hidden.type==='month'?'۱۴۰۵/۰۱':'۱۴۰۵/۰۱/۰۱';visible.readOnly=true;visible.dataset.for=hidden.id;
+  hidden.insertAdjacentElement('afterend',visible);visible.onclick=()=>openJalaliPicker(hidden,hidden.type);
+  if(hidden.value)visible.value=hidden.type==='month'?toJalali(hidden.value+'-01').slice(0,7):toJalali(hidden.value)
+ })
+}
+function syncJalaliInputs(){
+ initJalaliInputs();
+ document.querySelectorAll('.jalali-visible').forEach(v=>{const h=$(v.dataset.for);if(!h)return;const val=h.value||'';v.value=h.type==='month'?(val?toJalali(val+'-01').slice(0,7):''):(val?toJalali(val):'')})
+}
+function openJalaliPicker(hidden,mode='date'){
+ activeJalaliInput=hidden;activeJalaliMode=mode;
+ let j;if(hidden.value){const iso=mode==='month'?hidden.value+'-01':hidden.value;j=d2j(g2d(...iso.split('-').map(Number)))}else{const n=new Date();j=d2j(g2d(n.getFullYear(),n.getMonth()+1,n.getDate()))}
+ $('jalaliYear').innerHTML=Array.from({length:21},(_,i)=>j.jy-10+i).map(y=>`<option ${y===j.jy?'selected':''}>${y}</option>`).join('');
+ $('jalaliMonth').innerHTML=jalaliMonths.map((m,i)=>`<option value="${i+1}" ${i+1===j.jm?'selected':''}>${m}</option>`).join('');
+ updateJalaliDays(j.jd);$('jalaliMonth').onchange=()=>updateJalaliDays(1);$('jalaliYear').onchange=()=>updateJalaliDays(1);
+ $('jalaliDay').parentElement.style.display=mode==='month'?'none':'block';$('jalaliModal').classList.add('open')
+}
+function jalaliMonthLength(y,m){if(m<=6)return 31;if(m<=11)return 30;return jalCal(y).leap===0?30:29}
+function updateJalaliDays(selected=1){const y=+$('jalaliYear').value,m=+$('jalaliMonth').value,max=jalaliMonthLength(y,m);$('jalaliDay').innerHTML=Array.from({length:max},(_,i)=>i+1).map(d=>`<option ${d===selected?'selected':''}>${d}</option>`).join('')}
+function applyJalaliDate(){
+ if(!activeJalaliInput)return;const y=+$('jalaliYear').value,m=+$('jalaliMonth').value,d=activeJalaliMode==='month'?1:+$('jalaliDay').value;const g=d2g(j2d(y,m,d));
+ activeJalaliInput.value=activeJalaliMode==='month'?`${g.gy}-${String(g.gm).padStart(2,'0')}`:`${g.gy}-${String(g.gm).padStart(2,'0')}-${String(g.gd).padStart(2,'0')}`;
+ activeJalaliInput.dispatchEvent(new Event('change',{bubbles:true}));closeJalaliPicker();syncJalaliInputs()
+}
+function setJalaliToday(){const n=new Date(),j=d2j(g2d(n.getFullYear(),n.getMonth()+1,n.getDate()));$('jalaliYear').value=j.jy;$('jalaliMonth').value=j.jm;updateJalaliDays(j.jd)}
+function clearJalaliDate(){if(activeJalaliInput){activeJalaliInput.value='';activeJalaliInput.dispatchEvent(new Event('change',{bubbles:true}))}closeJalaliPicker();syncJalaliInputs()}
+function closeJalaliPicker(){$('jalaliModal').classList.remove('open')}
 
 // ================= Henas Customer Club =================
 function normalizePhone(v){return String(v||'').replace(/\D/g,'').replace(/^98/,'0')}
@@ -820,4 +1022,4 @@ function downloadExcelTemplate(ev){ev?.stopPropagation();if(typeof XLSX==='undef
 
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").hidden=false});$("installBtn").onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;$("installBtn").hidden=true}};
 if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js"));
-initNav();renderAll();setTimeout(()=>{setupDropZone('wordDrop','wordFiles',importWordFiles);setupDropZone('excelDrop','excelFiles',importExcelFiles);renderImportLog()},0);
+initNav();renderAll();initCloud();setTimeout(()=>{setupDropZone('wordDrop','wordFiles',importWordFiles);setupDropZone('excelDrop','excelFiles',importExcelFiles);renderImportLog()},0);
