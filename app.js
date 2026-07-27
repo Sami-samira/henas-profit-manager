@@ -18,9 +18,12 @@ const seed={
  chat:[{role:"bot",text:"سلام 👋 من دستیار باریستا هناس هستم. درباره رسپی‌ها، روش تهیه، لیوان، دما، آلرژن و عیب‌یابی نوشیدنی‌ها از من بپرس."}]
 };
 let db=JSON.parse(localStorage.getItem(KEY)||"null")||seed;
+db.ledgerEntries=Array.isArray(db.ledgerEntries)?db.ledgerEntries:[];
+db.offPosPayments=Array.isArray(db.offPosPayments)?db.offPosPayments:[];
+db.customers=Array.isArray(db.customers)?db.customers:[];
 let recipeDraft=[];
 let lastBotAnswer="";
-const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["import","ورود فایل"],["analysis","تحلیل"]];
+const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
 const $=id=>document.getElementById(id);
 function money(n){return Math.round(Number(n)||0).toLocaleString("fa-IR")+" تومان"}
 function num(n){return (Number(n)||0).toLocaleString("fa-IR",{maximumFractionDigits:1})}
@@ -97,12 +100,17 @@ function removeItem(type,id){db[type]=db[type].filter(x=>x.id!==id);save()}
 function metrics(){
  let sales=0,material=0,gross=0;
  db.recipes.forEach(r=>{const c=recipeCost(r);sales+=r.price*r.salesQty;material+=c*r.salesQty;gross+=(r.price-c)*r.salesQty});
+ const baseRate=sales?material/sales:.35;
+ const ledgerSales=(db.ledgerEntries||[]).filter(e=>e.type==='debit'&&e.includeInSales).reduce((s,e)=>s+(+e.amount||0),0);
+ const offPosSales=(db.offPosPayments||[]).filter(p=>p.includeInSales).reduce((s,p)=>s+(+p.amount||0),0);
+ const manualSales=ledgerSales+offPosSales;
+ sales+=manualSales;material+=manualSales*baseRate;gross+=manualSales*(1-baseRate);
  const expenses=db.expenses.reduce((s,e)=>s+e.amount,0);
  const waste=db.wastes.reduce((s,w)=>s+unitCost(db.ingredients.find(i=>i.id===w.ingredientId))*w.qty,0);
  const net=gross-expenses-waste,margin=sales?net/sales*100:0,variableRate=sales?material/sales:0;
  const fixed=db.expenses.filter(e=>e.type==="ثابت").reduce((s,e)=>s+e.amount,0);
  const breakEven=variableRate<1?fixed/(1-variableRate):0;
- return{sales,material,gross,expenses,waste,net,margin,variableRate,fixed,breakEven};
+ return{sales,material,gross,expenses,waste,net,margin,variableRate,fixed,breakEven,ledgerSales,offPosSales,manualSales};
 }
 function managerInsights(m){
  const a=[];
@@ -200,8 +208,141 @@ function renderDashboard(m){
  const gap=db.settings.targetProfit-m.net,con=1-m.variableRate,extra=gap>0&&con>0?gap/con:0;$("extraSales").textContent=money(extra);$("extraDaily").textContent=money(extra/db.settings.workDays);
  const d=db.recipes.map(r=>({name:r.name,sales:r.price*r.salesQty,profit:(r.price-recipeCost(r))*r.salesQty}));renderChart("profitChart",d,"profit");renderChart("salesChart",d,"sales");
 }
-function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m)}
+function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule()}
 
+
+
+// ======================= Customer Ledgers & Off-POS Payments =======================
+function localISODate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
+function localTime(d=new Date()){return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}
+function setFinancialDefaults(){
+ const date=localISODate(),time=localTime();
+ ['lDate','pDate'].forEach(id=>{const el=$(id);if(el&&!el.value)el.value=date});
+ ['lTime','pTime'].forEach(id=>{const el=$(id);if(el&&!el.value)el.value=time});
+}
+function customerKey(name){return normHeader(name||'')}
+function upsertCustomer(name,phone=''){
+ const n=String(name||'').trim();if(!n)return null;
+ let c=db.customers.find(x=>customerKey(x.name)===customerKey(n));
+ if(!c){c={id:uid(),name:n,phone:String(phone||'').trim(),createdAt:new Date().toISOString()};db.customers.push(c)}
+ else if(phone&&!c.phone)c.phone=String(phone).trim();
+ return c
+}
+function addLedgerEntry(){
+ const customer=$('lCustomer').value.trim(),amount=cleanNumber($('lAmount').value),type=$('lType').value;
+ if(!customer||amount<=0)return alert('نام مشتری و مبلغ را وارد کنید.');
+ const c=upsertCustomer(customer,$('lPhone').value);
+ db.ledgerEntries.push({
+   id:uid(),customerId:c.id,customerName:c.name,phone:c.phone,type,amount,
+   date:$('lDate').value||localISODate(),time:$('lTime').value||localTime(),
+   shift:$('lShift').value,responsible:$('lResponsible').value.trim(),
+   method:$('lMethod').value,tracking:$('lTracking').value.trim(),note:$('lNote').value.trim(),
+   includeInSales:type==='debit'&&$('lIncludeSales').checked,createdAt:new Date().toISOString()
+ });
+ ['lAmount','lTracking','lNote'].forEach(id=>$(id).value='');
+ save()
+}
+function addOffPosPayment(){
+ const amount=cleanNumber($('pAmount').value),method=$('pMethod').value,customer=$('pCustomer').value.trim();
+ if(amount<=0)return alert('مبلغ دریافت را وارد کنید.');
+ let c=customer?upsertCustomer(customer,$('pPhone').value):null;
+ const payment={
+   id:uid(),method,amount,customerId:c?.id||null,customerName:c?.name||customer,phone:c?.phone||$('pPhone').value.trim(),
+   date:$('pDate').value||localISODate(),time:$('pTime').value||localTime(),shift:$('pShift').value,
+   responsible:$('pResponsible').value.trim(),tracking:$('pTracking').value.trim(),
+   destination:$('pDestination').value.trim(),note:$('pNote').value.trim(),
+   includeInSales:$('pIncludeSales').checked,settledLedger:$('pSettleLedger').checked,createdAt:new Date().toISOString()
+ };
+ db.offPosPayments.push(payment);
+ if(payment.settledLedger){
+   if(!customer)return alert('برای کم‌کردن از حساب دفتری، نام مشتری را وارد کنید.');
+   db.ledgerEntries.push({
+     id:uid(),customerId:c.id,customerName:c.name,phone:c.phone,type:'credit',amount,
+     date:payment.date,time:payment.time,shift:payment.shift,responsible:payment.responsible,
+     method:payment.method,tracking:payment.tracking,note:`تسویه از طریق دریافت خارج پوز${payment.note?' - '+payment.note:''}`,
+     includeInSales:false,paymentId:payment.id,createdAt:new Date().toISOString()
+   })
+ }
+ ['pAmount','pTracking','pDestination','pNote'].forEach(id=>$(id).value='');
+ save()
+}
+function ledgerBalances(){
+ const map={};
+ db.customers.forEach(c=>map[c.id]={customerId:c.id,name:c.name,phone:c.phone||'',debit:0,credit:0,balance:0,lastDate:''});
+ db.ledgerEntries.forEach(e=>{
+   const id=e.customerId||customerKey(e.customerName);
+   map[id]=map[id]||{customerId:id,name:e.customerName||'بدون نام',phone:e.phone||'',debit:0,credit:0,balance:0,lastDate:''};
+   if(e.type==='debit')map[id].debit+=+e.amount||0;else map[id].credit+=+e.amount||0;
+   map[id].balance=map[id].debit-map[id].credit;
+   if((e.date||'')+(e.time||'')>(map[id].lastDate||''))map[id].lastDate=(e.date||'')+' '+(e.time||'')
+ });
+ return Object.values(map).sort((a,b)=>b.balance-a.balance)
+}
+function accountTotals(){
+ const balances=ledgerBalances(),today=localISODate();
+ const todays=db.offPosPayments.filter(p=>p.date===today);
+ return{
+  receivable:balances.reduce((s,x)=>s+Math.max(0,x.balance),0),
+  customerCredit:balances.reduce((s,x)=>s+Math.max(0,-x.balance),0),
+  todayOffPos:todays.reduce((s,x)=>s+(+x.amount||0),0),
+  todayCash:todays.filter(x=>x.method==='نقدی').reduce((s,x)=>s+(+x.amount||0),0),
+  todayTransfer:todays.filter(x=>x.method==='کارت به کارت'||x.method==='واریز بانکی').reduce((s,x)=>s+(+x.amount||0),0)
+ }
+}
+function fillLedgerCustomer(name){
+ $('lCustomer').value=name;$('lType').value='credit';$('lMethod').value='کارت به کارت';$('lCustomer').scrollIntoView({behavior:'smooth',block:'center'})
+}
+function deleteLedgerEntry(id){if(confirm('این گردش حساب حذف شود؟')){db.ledgerEntries=db.ledgerEntries.filter(x=>x.id!==id);save()}}
+function deleteOffPosPayment(id){
+ if(!confirm('این دریافت حذف شود؟'))return;
+ db.offPosPayments=db.offPosPayments.filter(x=>x.id!==id);
+ db.ledgerEntries=db.ledgerEntries.filter(x=>x.paymentId!==id);
+ save()
+}
+function clearLedgerFilters(){['ledgerFilterCustomer','ledgerFilterDate'].forEach(id=>$(id).value='');$('ledgerFilterType').value='';$('ledgerFilterShift').value='';renderAccountsModule()}
+function clearPaymentFilters(){['paymentFilterDate','paymentFilterResponsible'].forEach(id=>$(id).value='');$('paymentFilterMethod').value='';$('paymentFilterShift').value='';renderAccountsModule()}
+function renderAccountsModule(){
+ if(!$('ledgerReceivable'))return;
+ setFinancialDefaults();
+ const totals=accountTotals();
+ $('ledgerReceivable').textContent=money(totals.receivable);
+ $('todayOffPos').textContent=money(totals.todayOffPos);
+ $('todayCash').textContent=money(totals.todayCash);
+ $('todayTransfer').textContent=money(totals.todayTransfer);
+
+ const balances=ledgerBalances(),q=normHeader($('customerSearch').value||'');
+ const shown=balances.filter(x=>!q||normHeader(x.name).includes(q)||normHeader(x.phone).includes(q));
+ $('customerBalances').innerHTML=shown.length?shown.map(x=>`<div class="customer-card">
+   <div class="customer-head"><div><strong>${esc(x.name)}</strong><div class="customer-meta">${esc(x.phone||'شماره تماس ثبت نشده')} | آخرین گردش: ${esc(x.lastDate||'-')}</div></div>
+   <div class="account-balance ${x.balance>0?'debt':'credit'}">${x.balance>0?'بدهکار: ':x.balance<0?'بستانکار: ':'تسویه: '}${money(Math.abs(x.balance))}</div></div>
+   <div class="actions"><button class="btn" onclick="fillLedgerCustomer('${String(x.name).replace(/'/g,"\\'")}')">ثبت تسویه</button></div>
+ </div>`).join(''):'<div class="empty">مشتری یا مانده‌ای ثبت نشده است.</div>';
+ $('customerNames').innerHTML=db.customers.map(c=>`<option value="${esc(c.name)}">${esc(c.phone||'')}</option>`).join('');
+
+ const cf=normHeader($('ledgerFilterCustomer').value||''),df=$('ledgerFilterDate').value,tf=$('ledgerFilterType').value,sf=$('ledgerFilterShift').value;
+ const ledger=[...db.ledgerEntries].filter(e=>(!cf||normHeader(e.customerName).includes(cf))&&(!df||e.date===df)&&(!tf||e.type===tf)&&(!sf||e.shift===sf)).sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||'')));
+ $('ledgerTable').innerHTML='<tr><th>تاریخ</th><th>ساعت</th><th>مشتری</th><th>نوع</th><th>مبلغ</th><th>شیفت/مسئول</th><th>روش/پیگیری</th><th>توضیحات</th><th></th></tr>'+
+ ledger.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.time)}</td><td>${esc(e.customerName)}</td><td><span class="chip ${e.type==='debit'?'bad':'good'}">${e.type==='debit'?'بدهکار':'بستانکار/تسویه'}</span></td><td>${money(e.amount)}</td><td>${esc(e.shift||'-')} / ${esc(e.responsible||'-')}</td><td>${esc(e.method||'-')} ${e.tracking?'<br>'+esc(e.tracking):''}</td><td>${esc(e.note||'')}</td><td><button class="btn danger" onclick="deleteLedgerEntry(${e.id})">حذف</button></td></tr>`).join('');
+
+ const pd=$('paymentFilterDate').value,pm=$('paymentFilterMethod').value,ps=$('paymentFilterShift').value,pr=normHeader($('paymentFilterResponsible').value||'');
+ const payments=[...db.offPosPayments].filter(p=>(!pd||p.date===pd)&&(!pm||p.method===pm)&&(!ps||p.shift===ps)&&(!pr||normHeader(p.responsible).includes(pr))).sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||'')));
+ const pTotal=payments.reduce((s,x)=>s+(+x.amount||0),0),cash=payments.filter(x=>x.method==='نقدی').reduce((s,x)=>s+(+x.amount||0),0),transfer=payments.filter(x=>x.method==='کارت به کارت'||x.method==='واریز بانکی').reduce((s,x)=>s+(+x.amount||0),0);
+ $('paymentSummary').innerHTML=`<span class="chip">تعداد: ${num(payments.length)}</span><span class="chip good">جمع: ${money(pTotal)}</span><span class="chip">نقدی: ${money(cash)}</span><span class="chip">انتقال بانکی: ${money(transfer)}</span>`;
+ $('paymentsTable').innerHTML='<tr><th>تاریخ</th><th>ساعت</th><th>نوع پرداخت</th><th>مبلغ</th><th>پرداخت‌کننده</th><th>شیفت/مسئول</th><th>پیگیری/مقصد</th><th>توضیحات</th><th></th></tr>'+
+ payments.map(p=>`<tr><td>${esc(p.date)}</td><td>${esc(p.time)}</td><td><span class="chip ${p.method==='نقدی'?'warn':'good'}">${esc(p.method)}</span></td><td>${money(p.amount)}</td><td>${esc(p.customerName||'-')}</td><td>${esc(p.shift||'-')} / ${esc(p.responsible||'-')}</td><td>${esc(p.tracking||'-')}<br>${esc(p.destination||'')}</td><td>${esc(p.note||'')}${p.settledLedger?'<br><span class="chip good">تسویه حساب دفتری</span>':''}</td><td><button class="btn danger" onclick="deleteOffPosPayment(${p.id})">حذف</button></td></tr>`).join('')
+}
+function exportAccountsExcel(){
+ if(typeof XLSX==='undefined')return alert('کتابخانه Excel بارگذاری نشده است.');
+ const balances=ledgerBalances().map(x=>({'نام مشتری':x.name,'شماره تماس':x.phone,'جمع بدهکار':x.debit,'جمع بستانکار/تسویه':x.credit,'مانده':x.balance,'آخرین گردش':x.lastDate}));
+ const ledger=db.ledgerEntries.map(e=>({'تاریخ':e.date,'ساعت':e.time,'نام مشتری':e.customerName,'شماره تماس':e.phone,'نوع':e.type==='debit'?'بدهکار':'بستانکار/تسویه','مبلغ':e.amount,'شیفت':e.shift,'مسئول':e.responsible,'روش پرداخت':e.method,'شماره پیگیری':e.tracking,'توضیحات':e.note}));
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(balances),'مانده مشتریان');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(ledger),'گردش حساب');XLSX.writeFile(wb,'گزارش_حسابهای_دفتری_هناس.xlsx')
+}
+function exportPaymentsExcel(){
+ if(typeof XLSX==='undefined')return alert('کتابخانه Excel بارگذاری نشده است.');
+ const rows=db.offPosPayments.map(p=>({'تاریخ':p.date,'ساعت':p.time,'نوع پرداخت':p.method,'مبلغ':p.amount,'نام پرداخت‌کننده':p.customerName,'شماره تماس':p.phone,'شیفت':p.shift,'مسئول':p.responsible,'شماره پیگیری':p.tracking,'حساب مقصد':p.destination,'توضیحات':p.note,'تسویه حساب دفتری':p.settledLedger?'بله':'خیر','ثبت در فروش':p.includeInSales?'بله':'خیر'}));
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'دریافت خارج پوز');XLSX.writeFile(wb,'گزارش_دریافتهای_خارج_پوز_هناس.xlsx')
+}
+function printAccountsReport(){showPage('accounts');setTimeout(()=>window.print(),100)}
 
 // ======================= Bulk Word / Excel Import =======================
 const importState={logs:[],preview:[]};

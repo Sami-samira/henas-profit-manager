@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon-192.png">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
-  <title>Henas Cafe OS</title>
+  <title>Henas Cafe OS | حساب مشتریان</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap');
     :root{
@@ -71,6 +71,20 @@
     .template-card h4{margin:0 0 7px}.template-card p{color:#aaa;font-size:12px;line-height:1.7}
     .preview-table{max-height:260px;overflow:auto;border-radius:12px;margin-top:10px}
     @media(max-width:800px){.template-grid{grid-template-columns:1fr}}
+  
+    .finance-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:13px}
+    .finance-kpi{background:#171717;border:1px solid #3c3c3c;border-radius:17px;padding:15px}
+    .finance-kpi small{color:#aaa}.finance-kpi strong{display:block;font-size:23px;margin-top:7px}
+    .account-balance{font-weight:900}.account-balance.debt{color:#e58a8a}.account-balance.credit{color:#b4d2aa}
+    .customer-card{background:#141414;border:1px solid #363636;border-radius:15px;padding:13px;margin-bottom:9px}
+    .customer-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .customer-meta{color:#aaa;font-size:12px;margin-top:5px}
+    .filter-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+    .summary-strip{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.summary-strip .chip{font-size:12px;padding:7px 11px}
+    .checkline{display:flex;align-items:center;gap:7px;color:#ccc;font-size:12px}.checkline input{width:auto}
+    @media(max-width:900px){.finance-kpis{grid-template-columns:repeat(2,1fr)}.filter-bar{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px){.finance-kpis{grid-template-columns:1fr 1fr}.filter-bar{grid-template-columns:1fr}.customer-head{align-items:flex-start;flex-direction:column}}
+
   </style>
 </head>
 <body>
@@ -212,6 +226,107 @@
       <div class="card span12">
         <h2>موجودی و پیشنهاد خرید</h2>
         <div class="table-wrap"><table id="inventoryTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="page" data-page="accounts">
+    <div class="hero">
+      <div class="hero-top">
+        <div>
+          <h2>حساب‌های دفتری و دریافت‌های خارج از پوز</h2>
+          <p>خرید نسیه مشتریان، تسویه حساب، دریافت نقدی و کارت‌به‌کارت را با تاریخ، ساعت، شیفت، مسئول و شماره پیگیری ثبت و کنترل کنید.</p>
+        </div>
+        <div class="hero-orb">₮</div>
+      </div>
+    </div>
+
+    <div class="finance-kpis">
+      <div class="finance-kpi"><small>مانده مطالبات مشتریان</small><strong id="ledgerReceivable">۰</strong></div>
+      <div class="finance-kpi"><small>دریافت خارج از پوز امروز</small><strong id="todayOffPos">۰</strong></div>
+      <div class="finance-kpi"><small>نقدی امروز</small><strong id="todayCash">۰</strong></div>
+      <div class="finance-kpi"><small>کارت‌به‌کارت امروز</small><strong id="todayTransfer">۰</strong></div>
+    </div>
+
+    <div class="grid">
+      <div class="card span6">
+        <div class="section-title"><h2>ثبت حساب دفتری مشتری</h2><span class="chip warn">بدهکار / بستانکار</span></div>
+        <div class="form two">
+          <div><label>نام و نام خانوادگی مشتری</label><input id="lCustomer" list="customerNames" placeholder="نام مشتری"></div>
+          <div><label>شماره تماس</label><input id="lPhone" inputmode="tel" placeholder="اختیاری"></div>
+          <div><label>نوع ثبت</label><select id="lType"><option value="debit">خرید نسیه؛ مشتری بدهکار شد</option><option value="credit">تسویه یا بستانکار کردن حساب</option></select></div>
+          <div><label>مبلغ (تومان)</label><input id="lAmount" type="number"></div>
+          <div><label>تاریخ</label><input id="lDate" type="date"></div>
+          <div><label>ساعت</label><input id="lTime" type="time"></div>
+          <div><label>شیفت</label><select id="lShift"><option>صبح</option><option>عصر</option><option>شب</option></select></div>
+          <div><label>مسئول ثبت</label><input id="lResponsible" placeholder="نام باریستا / صندوق‌دار"></div>
+          <div><label>روش تسویه</label><select id="lMethod"><option value="">برای خرید نسیه ندارد</option><option>نقدی</option><option>کارت به کارت</option><option>واریز بانکی</option><option>پوز</option><option>سایر</option></select></div>
+          <div><label>شماره پیگیری</label><input id="lTracking" placeholder="در صورت تسویه"></div>
+        </div>
+        <div><label>توضیحات</label><textarea id="lNote" placeholder="شرح خرید، شماره فاکتور یا توضیحات تسویه"></textarea></div>
+        <div class="actions">
+          <label class="checkline"><input id="lIncludeSales" type="checkbox" checked> خرید نسیه در فروش کل لحاظ شود</label>
+          <button class="btn good" onclick="addLedgerEntry()">ثبت حساب دفتری</button>
+        </div>
+      </div>
+
+      <div class="card span6">
+        <div class="section-title"><h2>ثبت دریافت نقدی یا کارت‌به‌کارت</h2><span class="chip good">خارج از دستگاه پوز</span></div>
+        <div class="form two">
+          <div><label>نوع پرداخت</label><select id="pMethod"><option>نقدی</option><option>کارت به کارت</option><option>واریز بانکی</option><option>سایر</option></select></div>
+          <div><label>مبلغ (تومان)</label><input id="pAmount" type="number"></div>
+          <div><label>نام پرداخت‌کننده</label><input id="pCustomer" list="customerNames" placeholder="اختیاری"></div>
+          <div><label>شماره تماس</label><input id="pPhone" inputmode="tel" placeholder="اختیاری"></div>
+          <div><label>تاریخ</label><input id="pDate" type="date"></div>
+          <div><label>ساعت</label><input id="pTime" type="time"></div>
+          <div><label>شیفت</label><select id="pShift"><option>صبح</option><option>عصر</option><option>شب</option></select></div>
+          <div><label>مسئول دریافت</label><input id="pResponsible" placeholder="نام صندوق‌دار"></div>
+          <div><label>شماره پیگیری / چهار رقم کارت</label><input id="pTracking"></div>
+          <div><label>حساب یا کارت مقصد</label><input id="pDestination" placeholder="مثلاً کارت بانک ملت"></div>
+        </div>
+        <div><label>توضیحات</label><textarea id="pNote" placeholder="علت عدم استفاده از پوز، شماره سفارش یا توضیحات"></textarea></div>
+        <div class="actions">
+          <label class="checkline"><input id="pIncludeSales" type="checkbox" checked> این مبلغ فروش خارج از پوز است</label>
+          <label class="checkline"><input id="pSettleLedger" type="checkbox"> هم‌زمان از بدهی مشتری کم شود</label>
+          <button class="btn good" onclick="addOffPosPayment()">ثبت دریافت</button>
+        </div>
+      </div>
+
+      <datalist id="customerNames"></datalist>
+
+      <div class="card span5">
+        <div class="section-title">
+          <h2>مانده حساب مشتریان</h2>
+          <button class="btn" onclick="exportAccountsExcel()">خروجی Excel</button>
+        </div>
+        <input id="customerSearch" placeholder="جست‌وجوی مشتری..." oninput="renderAccountsModule()">
+        <div id="customerBalances" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card span7">
+        <div class="section-title"><h2>گردش حساب‌های دفتری</h2><button class="btn danger" onclick="clearLedgerFilters()">پاک‌کردن فیلتر</button></div>
+        <div class="filter-bar">
+          <input id="ledgerFilterCustomer" placeholder="نام مشتری" oninput="renderAccountsModule()">
+          <input id="ledgerFilterDate" type="date" onchange="renderAccountsModule()">
+          <select id="ledgerFilterType" onchange="renderAccountsModule()"><option value="">همه انواع</option><option value="debit">بدهکار</option><option value="credit">بستانکار/تسویه</option></select>
+          <select id="ledgerFilterShift" onchange="renderAccountsModule()"><option value="">همه شیفت‌ها</option><option>صبح</option><option>عصر</option><option>شب</option></select>
+          <button class="btn" onclick="printAccountsReport()">چاپ گزارش</button>
+        </div>
+        <div class="table-wrap"><table id="ledgerTable"></table></div>
+      </div>
+
+      <div class="card span12">
+        <div class="section-title"><h2>دریافت‌های نقدی و کارت‌به‌کارت</h2><button class="btn" onclick="exportPaymentsExcel()">خروجی Excel</button></div>
+        <div class="filter-bar">
+          <input id="paymentFilterDate" type="date" onchange="renderAccountsModule()">
+          <select id="paymentFilterMethod" onchange="renderAccountsModule()"><option value="">همه روش‌ها</option><option>نقدی</option><option>کارت به کارت</option><option>واریز بانکی</option><option>سایر</option></select>
+          <select id="paymentFilterShift" onchange="renderAccountsModule()"><option value="">همه شیفت‌ها</option><option>صبح</option><option>عصر</option><option>شب</option></select>
+          <input id="paymentFilterResponsible" placeholder="مسئول دریافت" oninput="renderAccountsModule()">
+          <button class="btn danger" onclick="clearPaymentFilters()">پاک‌کردن فیلتر</button>
+        </div>
+        <div id="paymentSummary" class="summary-strip"></div>
+        <div class="table-wrap"><table id="paymentsTable"></table></div>
       </div>
     </div>
   </section>
