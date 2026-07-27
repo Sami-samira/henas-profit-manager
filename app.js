@@ -21,9 +21,17 @@ let db=JSON.parse(localStorage.getItem(KEY)||"null")||seed;
 db.ledgerEntries=Array.isArray(db.ledgerEntries)?db.ledgerEntries:[];
 db.offPosPayments=Array.isArray(db.offPosPayments)?db.offPosPayments:[];
 db.customers=Array.isArray(db.customers)?db.customers:[];
+db.employees=Array.isArray(db.employees)&&db.employees.length?db.employees:[
+ {id:9001,name:"کیمیا افکاری",role:"باریستا",pin:"1234",baseSalary:15000000,overtimeRate:62500,dailyTarget:4250000,targetBonus:200000,dailyHours:8,active:true}
+];
+db.attendance=Array.isArray(db.attendance)?db.attendance:[];
+db.correctionRequests=Array.isArray(db.correctionRequests)?db.correctionRequests:[];
+db.appSecurity=db.appSecurity||{managerPin:"1403"};
+let activeRole=sessionStorage.getItem("henasRole")||"";
+let activeEmployeeId=Number(sessionStorage.getItem("henasEmployeeId")||0);
 let recipeDraft=[];
 let lastBotAnswer="";
-const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
+const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["staff","پرسنل"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
 const $=id=>document.getElementById(id);
 function money(n){return Math.round(Number(n)||0).toLocaleString("fa-IR")+" تومان"}
 function num(n){return (Number(n)||0).toLocaleString("fa-IR",{maximumFractionDigits:1})}
@@ -208,9 +216,152 @@ function renderDashboard(m){
  const gap=db.settings.targetProfit-m.net,con=1-m.variableRate,extra=gap>0&&con>0?gap/con:0;$("extraSales").textContent=money(extra);$("extraDaily").textContent=money(extra/db.settings.workDays);
  const d=db.recipes.map(r=>({name:r.name,sales:r.price*r.salesQty,profit:(r.price-recipeCost(r))*r.salesQty}));renderChart("profitChart",d,"profit");renderChart("salesChart",d,"sales");
 }
-function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule()}
+function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();fillRoleGate()}
 
 
+
+
+// ================= Personnel / Manager Panels =================
+function minutesBetween(start,end){
+ if(!start||!end)return 0;
+ const [sh,sm]=start.split(':').map(Number),[eh,em]=end.split(':').map(Number);
+ let a=sh*60+sm,b=eh*60+em;if(b<a)b+=1440;return b-a
+}
+function attendanceCalc(a,emp){
+ const raw=Math.max(0,minutesBetween(a.inTime,a.outTime)-(+a.breakMinutes||0));
+ const standard=(+emp.dailyHours||8)*60;
+ return{rawMinutes:raw,workedHours:raw/60,overtimeMinutes:Math.max(0,raw-standard),shortageMinutes:Math.max(0,standard-raw)}
+}
+function fillRoleGate(){
+ if(!$('gateEmployee'))return;
+ $('gateEmployee').innerHTML=db.employees.filter(e=>e.active!==false).map(e=>`<option value="${e.id}">${esc(e.name)} - ${esc(e.role||'')}</option>`).join('');
+ if(activeRole){$('roleGate').classList.add('hidden');applyRoleUI()}
+}
+function enterPersonnelPanel(){
+ const id=+$('gateEmployee').value,pin=$('gateEmployeePin').value;
+ const emp=db.employees.find(e=>e.id===id&&String(e.pin)===String(pin));
+ if(!emp)return alert('نام یا PIN پرسنل صحیح نیست.');
+ activeRole='personnel';activeEmployeeId=id;sessionStorage.setItem('henasRole',activeRole);sessionStorage.setItem('henasEmployeeId',id);
+ $('roleGate').classList.add('hidden');showPage('staff');applyRoleUI();renderStaffModule()
+}
+function enterManagerPanel(){
+ if(String($('gateManagerPin').value)!==String(db.appSecurity.managerPin))return alert('PIN مدیر صحیح نیست.');
+ activeRole='manager';activeEmployeeId=0;sessionStorage.setItem('henasRole',activeRole);sessionStorage.removeItem('henasEmployeeId');
+ $('roleGate').classList.add('hidden');showPage('staff');applyRoleUI();renderStaffModule()
+}
+function logoutRole(){sessionStorage.removeItem('henasRole');sessionStorage.removeItem('henasEmployeeId');activeRole='';activeEmployeeId=0;$('roleGate').classList.remove('hidden');fillRoleGate()}
+function applyRoleUI(){
+ if(!$('personnelPanel'))return;
+ const isManager=activeRole==='manager';
+ $('personnelPanel').style.display=isManager?'none':'block';
+ $('managerPanel').style.display=isManager?'block':'none';
+ $('staffPanelTitle').textContent=isManager?'پنل مدیر':'پنل پرسنل';
+ const emp=db.employees.find(e=>e.id===activeEmployeeId);
+ $('staffPanelSubtitle').textContent=isManager?'تأیید کارکرد، تارگت و محاسبه حقوق':`${emp?.name||''} | ${emp?.role||''}`;
+ document.querySelectorAll('.tab,.bottom-nav button').forEach(btn=>{
+  const page=pages.find(p=>p[1]===btn.textContent)?.[0];
+  if(activeRole==='personnel'&&page&&page!=='staff'&&page!=='assistant'&&page!=='recipes')btn.style.display='none';
+  else btn.style.display=''
+ })
+}
+function addEmployee(){
+ const name=$('empName').value.trim(),pin=$('empPin').value.trim();
+ if(!name||!pin)return alert('نام و PIN را وارد کنید.');
+ db.employees.push({id:uid(),name,role:$('empRole').value.trim(),pin,baseSalary:cleanNumber($('empBaseSalary').value),overtimeRate:cleanNumber($('empOvertimeRate').value)||62500,dailyTarget:cleanNumber($('empTarget').value)||4250000,targetBonus:cleanNumber($('empTargetBonus').value)||200000,dailyHours:+$('empDailyHours').value||8,active:true});
+ ['empName','empRole','empPin','empBaseSalary'].forEach(id=>$(id).value='');save()
+}
+function toggleEmployee(id){const e=db.employees.find(x=>x.id===id);if(e)e.active=e.active===false?true:false;save()}
+function submitAttendance(){
+ const emp=db.employees.find(e=>e.id===activeEmployeeId);if(!emp)return;
+ const date=$('aDate').value||localISODate(),inTime=$('aIn').value,outTime=$('aOut').value;
+ if(!inTime||!outTime)return alert('ساعت ورود و خروج را وارد کنید.');
+ if(minutesBetween(inTime,outTime)<=0)return alert('ساعت خروج باید بعد از ورود باشد.');
+ const exists=db.attendance.find(a=>a.employeeId===emp.id&&a.date===date&&a.status!=='rejected');
+ if(exists&&!confirm('برای این تاریخ قبلاً رکورد ثبت شده است. رکورد جدید ارسال شود؟'))return;
+ db.attendance.push({id:uid(),employeeId:emp.id,employeeName:emp.name,date,shift:$('aShift').value,inTime,outTime,breakMinutes:+$('aBreak').value||0,sales:cleanNumber($('aSales').value),note:$('aNote').value.trim(),status:'pending',submittedAt:new Date().toISOString(),approvedAt:null,managerNote:''});
+ ['aIn','aOut','aSales','aNote'].forEach(id=>$(id).value='');$('aBreak').value=0;save()
+}
+function approveAttendance(id,approved){
+ const a=db.attendance.find(x=>x.id===id);if(!a)return;
+ a.status=approved?'approved':'rejected';a.approvedAt=new Date().toISOString();a.managerNote=approved?'تأیید مدیر':prompt('دلیل رد یا توضیح مدیر:','')||'رد مدیر';save()
+}
+function approveAllPending(){db.attendance.filter(a=>a.status==='pending').forEach(a=>{a.status='approved';a.approvedAt=new Date().toISOString();a.managerNote='تأیید گروهی مدیر'});save()}
+function deleteAttendance(id){if(confirm('رکورد حذف شود؟')){db.attendance=db.attendance.filter(x=>x.id!==id);save()}}
+function submitCorrection(){
+ const id=+$('correctionAttendance').value,reason=$('correctionReason').value.trim();
+ if(!id||!reason)return alert('رکورد و دلیل اصلاح را انتخاب کنید.');
+ const a=db.attendance.find(x=>x.id===id);if(!a)return;
+ db.correctionRequests.push({id:uid(),attendanceId:id,employeeId:a.employeeId,employeeName:a.employeeName,oldIn:a.inTime,oldOut:a.outTime,newIn:$('correctionIn').value||a.inTime,newOut:$('correctionOut').value||a.outTime,reason,status:'pending',createdAt:new Date().toISOString()});
+ $('correctionReason').value='';save()
+}
+function resolveCorrection(id,approve){
+ const r=db.correctionRequests.find(x=>x.id===id);if(!r)return;
+ r.status=approve?'approved':'rejected';r.resolvedAt=new Date().toISOString();
+ if(approve){const a=db.attendance.find(x=>x.id===r.attendanceId);if(a){a.inTime=r.newIn;a.outTime=r.newOut;a.status='approved';a.managerNote='اصلاح تأییدشده مدیر'}}
+ save()
+}
+function renderStaffModule(){
+ if(!$('staffPanelTitle'))return;
+ setFinancialDefaults();
+ if(!$('aDate').value)$('aDate').value=localISODate();
+ if(!$('payrollMonth').value)$('payrollMonth').value=localISODate().slice(0,7);
+ applyRoleUI();
+ const emp=db.employees.find(e=>e.id===activeEmployeeId);
+
+ if(emp){
+  const mine=db.attendance.filter(a=>a.employeeId===emp.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const approved=mine.filter(a=>a.status==='approved');
+  const calcs=approved.map(a=>attendanceCalc(a,emp));
+  $('empApprovedHours').textContent=num(calcs.reduce((s,x)=>s+x.workedHours,0))+' ساعت';
+  $('empOvertime').textContent=num(calcs.reduce((s,x)=>s+x.overtimeMinutes,0)/60)+' ساعت';
+  $('empTargetDays').textContent=num(approved.filter(a=>(+a.sales||0)>=emp.dailyTarget).length);
+  const last=mine[0];$('empLastStatus').textContent=last?(last.status==='approved'?'تأییدشده':last.status==='rejected'?'ردشده':'در انتظار'):'-';
+  $('myAttendanceTable').innerHTML='<tr><th>تاریخ</th><th>ورود</th><th>خروج</th><th>کارکرد</th><th>فروش</th><th>وضعیت</th></tr>'+
+   mine.map(a=>{const c=attendanceCalc(a,emp);return `<tr><td>${a.date}</td><td>${a.inTime}</td><td>${a.outTime}</td><td>${num(c.workedHours)} ساعت</td><td>${money(a.sales||0)}</td><td><span class="staff-chip ${a.status}">${a.status==='approved'?'تأیید':a.status==='rejected'?'رد':'در انتظار'}</span></td></tr>`}).join('');
+  $('correctionAttendance').innerHTML=mine.map(a=>`<option value="${a.id}">${a.date} | ${a.inTime}-${a.outTime}</option>`).join('')
+ }
+
+ const pending=db.attendance.filter(a=>a.status==='pending');
+ const approvedAll=db.attendance.filter(a=>a.status==='approved');
+ let totalApprovedMinutes=0,totalOver=0,totalBonus=0;
+ approvedAll.forEach(a=>{const e=db.employees.find(x=>x.id===a.employeeId);if(!e)return;const c=attendanceCalc(a,e);totalApprovedMinutes+=c.rawMinutes;totalOver+=c.overtimeMinutes;if((+a.sales||0)>=e.dailyTarget)totalBonus+=e.targetBonus});
+ $('mgrPending').textContent=num(pending.length);$('mgrApprovedHours').textContent=num(totalApprovedMinutes/60)+' ساعت';$('mgrOvertime').textContent=num(totalOver/60)+' ساعت';$('mgrTargetBonus').textContent=money(totalBonus);
+
+ $('employeeCards').innerHTML=db.employees.map(e=>`<div class="customer-card"><div class="customer-head"><div><strong>${esc(e.name)}</strong><div class="customer-meta">${esc(e.role||'')} | تارگت ${money(e.dailyTarget)} | اضافه‌کاری ${money(e.overtimeRate)}</div></div><span class="staff-chip ${e.active===false?'rejected':'approved'}">${e.active===false?'غیرفعال':'فعال'}</span></div><div class="actions"><button class="btn" onclick="toggleEmployee(${e.id})">${e.active===false?'فعال‌سازی':'غیرفعال‌کردن'}</button></div></div>`).join('');
+ $('managerAttendanceTable').innerHTML='<tr><th>پرسنل</th><th>تاریخ</th><th>ورود/خروج</th><th>کارکرد</th><th>فروش/تارگت</th><th>وضعیت</th><th>اقدام</th></tr>'+
+ db.attendance.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(a=>{const e=db.employees.find(x=>x.id===a.employeeId)||{};const c=attendanceCalc(a,e);return `<tr><td>${esc(a.employeeName)}</td><td>${a.date}</td><td>${a.inTime} - ${a.outTime}<br>استراحت ${num(a.breakMinutes)} دقیقه</td><td>${num(c.workedHours)} ساعت<br>اضافه ${num(c.overtimeMinutes/60)} | کسری ${num(c.shortageMinutes/60)}</td><td>${money(a.sales||0)}<br>${(+a.sales||0)>=e.dailyTarget?'<span class="staff-chip approved">تارگت محقق</span>':'<span class="staff-chip pending">زیر تارگت</span>'}</td><td><span class="staff-chip ${a.status}">${a.status==='approved'?'تأیید':a.status==='rejected'?'رد':'در انتظار'}</span></td><td>${a.status==='pending'?`<button class="btn good" onclick="approveAttendance(${a.id},true)">تأیید</button> <button class="btn danger" onclick="approveAttendance(${a.id},false)">رد</button>`:`<button class="btn danger" onclick="deleteAttendance(${a.id})">حذف</button>`}</td></tr>`}).join('');
+ $('payrollEmployee').innerHTML=db.employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+ $('correctionRequests').innerHTML=db.correctionRequests.length?db.correctionRequests.slice().reverse().map(r=>`<div class="request-card"><strong>${esc(r.employeeName)}</strong> | ${r.oldIn}-${r.oldOut} ← ${r.newIn}-${r.newOut}<br><span style="color:#aaa">${esc(r.reason)}</span><div class="actions">${r.status==='pending'?`<button class="btn good" onclick="resolveCorrection(${r.id},true)">تأیید اصلاح</button><button class="btn danger" onclick="resolveCorrection(${r.id},false)">رد</button>`:`<span class="staff-chip ${r.status}">${r.status==='approved'?'تأییدشده':'ردشده'}</span>`}</div></div>`).join(''):'<div class="empty">درخواستی ثبت نشده است.</div>';
+ renderPayroll()
+}
+function renderPayroll(){
+ if(!$('payrollOutput'))return;
+ const emp=db.employees.find(e=>e.id===+$('payrollEmployee').value)||db.employees[0];if(!emp){$('payrollOutput').innerHTML='<div class="empty">پرسنلی تعریف نشده است.</div>';return}
+ const month=$('payrollMonth').value||localISODate().slice(0,7);
+ const rows=db.attendance.filter(a=>a.employeeId===emp.id&&a.status==='approved'&&a.date.startsWith(month));
+ let worked=0,overtime=0,shortage=0,targetDays=0;
+ rows.forEach(a=>{const c=attendanceCalc(a,emp);worked+=c.rawMinutes;overtime+=c.overtimeMinutes;shortage+=c.shortageMinutes;if((+a.sales||0)>=emp.dailyTarget)targetDays++});
+ const overtimePay=overtime/60*emp.overtimeRate,targetPay=targetDays*emp.targetBonus,benefits=cleanNumber($('payrollBenefits').value),deductions=cleanNumber($('payrollDeductions').value);
+ const hourlyBase=(emp.baseSalary||0)/(30*(emp.dailyHours||8)),shortageDeduction=shortage/60*hourlyBase;
+ const net=(emp.baseSalary||0)+overtimePay+targetPay+benefits-deductions-shortageDeduction;
+ $('payrollOutput').innerHTML=`<div class="section-title"><div><h2 style="margin:0">فیش کارکرد ${esc(emp.name)}</h2><div style="color:#aaa">ماه ${month} | ${esc(emp.role||'')}</div></div><strong>${money(net)}</strong></div>
+ <div class="salary-grid">
+  <div class="salary-box"><small>روز حضور تأییدشده</small><strong>${num(rows.length)}</strong></div>
+  <div class="salary-box"><small>مجموع کارکرد</small><strong>${num(worked/60)} ساعت</strong></div>
+  <div class="salary-box"><small>اضافه‌کاری</small><strong>${num(overtime/60)} ساعت</strong></div>
+  <div class="salary-box"><small>کسری کار</small><strong>${num(shortage/60)} ساعت</strong></div>
+  <div class="salary-box"><small>روزهای تارگت</small><strong>${num(targetDays)}</strong></div>
+  <div class="salary-box"><small>مبلغ اضافه‌کاری</small><strong>${money(overtimePay)}</strong></div>
+  <div class="salary-box"><small>پاداش تارگت</small><strong>${money(targetPay)}</strong></div>
+  <div class="salary-box"><small>کسر کارکرد</small><strong>${money(shortageDeduction)}</strong></div>
+  <div class="salary-box"><small>حقوق ثابت</small><strong>${money(emp.baseSalary||0)}</strong></div>
+  <div class="salary-box"><small>مزایا</small><strong>${money(benefits)}</strong></div>
+  <div class="salary-box"><small>کسورات/مساعده</small><strong>${money(deductions)}</strong></div>
+  <div class="salary-box"><small>خالص قابل پرداخت</small><strong class="${net>=0?'goodText':'badText'}">${money(net)}</strong></div>
+ </div>
+ <div class="table-wrap" style="margin-top:14px"><table><tr><th>تاریخ</th><th>ورود</th><th>خروج</th><th>کارکرد</th><th>اضافه</th><th>کسری</th><th>فروش</th><th>پاداش</th></tr>${rows.map(a=>{const c=attendanceCalc(a,emp);return `<tr><td>${a.date}</td><td>${a.inTime}</td><td>${a.outTime}</td><td>${num(c.workedHours)}</td><td>${num(c.overtimeMinutes/60)}</td><td>${num(c.shortageMinutes/60)}</td><td>${money(a.sales||0)}</td><td>${(+a.sales||0)>=emp.dailyTarget?money(emp.targetBonus):'-'}</td></tr>`}).join('')}</table></div>`
+}
+function printPayroll(){showPage('staff');setTimeout(()=>window.print(),100)}
 
 // ======================= Customer Ledgers & Off-POS Payments =======================
 function localISODate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
@@ -356,66 +507,9 @@ function renderImportLog(){const el=$('importSummary');if(!el)return;el.innerHTM
 function setupDropZone(id,inputId,handler){const zone=$(id);if(!zone)return;['dragenter','dragover'].forEach(e=>zone.addEventListener(e,ev=>{ev.preventDefault();zone.classList.add('drag')}));['dragleave','drop'].forEach(e=>zone.addEventListener(e,ev=>{ev.preventDefault();zone.classList.remove('drag')}));zone.addEventListener('drop',ev=>handler(ev.dataTransfer.files))}
 
 async function importWordFiles(files){if(!files?.length)return;if(typeof mammoth==='undefined'){addLog('error','کتابخانه Word بارگذاری نشده','اتصال اینترنت را بررسی و صفحه را دوباره باز کنید.');return}for(const file of [...files]){try{const buffer=await file.arrayBuffer();const result=await mammoth.convertToHtml({arrayBuffer:buffer});const imported=parseWordRecipes(result.value,file.name);addLog(imported.count?'success':'warn',file.name,`${imported.count} رسپی و ${imported.ingredients} ماده جدید استخراج شد.${imported.warnings.length?' '+imported.warnings.join(' | '):''}`)}catch(e){addLog('error',file.name,e.message||'خواندن فایل Word ناموفق بود.')}}save()}
-function normalizeWordUnit(unit){
- let u=normHeader(unit);if(u==='g'||u==='گرم')return 'گرم';if(u==='ml'||u.includes('میلیلیتر'))return 'میلی‌لیتر';if(['عدد','پیمانه','شات','قاشق','اسکوپ'].some(x=>u.includes(normHeader(x))))return 'عدد';return String(unit||'').trim()||'عدد'
-}
-function meaningfulWordValue(v){const n=normHeader(v);return v&&!/^(نیازمندورود|نیازمندتکمیلمدیر|نیازمندبازبینیمدیر|نیازمندبررسیوتأییدمدیر|ثبتنشده|نامشخص)$/.test(n)}
-function parseMetaPair(meta,key,value){const k=normHeader(key),v=String(value||'').trim();if(!v)return;
- if(k==='دسته')meta.category=v;
- else if(/^(حجمسرو|حجم|سایز|لیوان)$/.test(k))meta.cup=meaningfulWordValue(v)?v:'';
- else if(/^(زمانآمادهسازی|زمانتهیه|زمان)$/.test(k))meta.time=meaningfulWordValue(v)?v:'';
- else if(/^(دمایسروتهیه|دمایتهیه|دمایسرو|دما|درجه)$/.test(k))meta.temp=meaningfulWordValue(v)?v:'';
- else if(/^(آلرژنها|آلرژن|حساسیتها|حساسیت)$/.test(k))meta.allergens=meaningfulWordValue(v)?v:'';
- else if(/^(قیمتفروشتومان|قیمتفروش|قیمت)$/.test(k))meta.price=cleanNumber(v);
- else if(/^(تعدادفروشماهانه|تعدادفروش|فروشماهانه)$/.test(k))meta.salesQty=cleanNumber(v)
-}
-function parseStandardWordRecipes(html,fileName){
- const doc=new DOMParser().parseFromString(html,'text/html');let category='';let current=null;const parsed=[];const warnings=[];
- function blankRecipe(name){return{name:String(name||'').trim(),meta:{category:category||'',cup:'',time:'',temp:'',allergens:'',price:0,salesQty:0},ingredients:[],steps:[],mode:''}}
- function finish(){if(!current)return;if(current.name&&current.ingredients.length)parsed.push(current);else if(current.name&&!/^(راهنمای|دفترچه|آماده برای)/.test(current.name))warnings.push(`برای «${current.name}» جدول مواد قابل تشخیص نبود`);current=null}
- function parseTable(table){if(!current)return;const rows=[...table.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(c=>c.textContent.replace(/\s+/g,' ').trim()));if(!rows.length)return;const head=rows[0].map(normHeader);
-  if(head.includes('ماده')&&head.includes('مقدار')){const nameIdx=head.indexOf('ماده'),qtyIdx=head.indexOf('مقدار'),unitIdx=head.indexOf('واحد');rows.slice(1).forEach(r=>{const name=(r[nameIdx]||'').trim(),qty=cleanNumber(r[qtyIdx]),unit=normalizeWordUnit(unitIdx>=0?r[unitIdx]:'');if(name&&qty>0)current.ingredients.push({name,qty,unit})});return}
-  rows.forEach(r=>{for(let i=0;i+1<r.length;i+=2)parseMetaPair(current.meta,r[i],r[i+1])})
- }
- function addText(text,tag=''){const t=String(text||'').replace(/\s+/g,' ').trim();if(!t||!current)return;const n=normHeader(t);
-  if(/^نامانگلیسی/.test(n))return;
-  if(/^(مواداولیه|موادلازم|ترکیبات)$/.test(n)){current.mode='ingredients';return}
-  if(/^(مراحلتهیه|روشتهیه|دستورتهیه|طرزتهیه)$/.test(n)){current.mode='steps';return}
-  const colon=t.split(/[:：]/);if(colon.length>1){parseMetaPair(current.meta,colon[0],colon.slice(1).join(':'));if(['دسته','حجمسرو','حجم','سایز','لیوان','زمانآمادهسازی','زمان','دمایسروتهیه','دما','آلرژنها','آلرژن','قیمتفروشتومان','قیمتفروش','تعدادفروشماهانه','تعدادفروش'].includes(normHeader(colon[0])))return}
-  if(current.mode==='steps'||tag==='li'){
-    const clean=t.replace(/^[\d۰-۹]+[.\-)،]\s*/,'').trim();
-    if(clean&&!/^مراحل دقیق تهیه در فایل اصلی ثبت نشده/.test(clean)&&!/^نیازمند تکمیل/.test(clean)&&!/^یادداشت اپراتوری/.test(clean))current.steps.push(clean);return
-  }
-  const ing=parseIngredientLine(t);if(ing)current.ingredients.push(ing)
- }
- [...doc.body.children].forEach(el=>{const tag=el.tagName.toLowerCase(),text=el.textContent.replace(/\s+/g,' ').trim();
-  if(tag==='h1'){finish();category=text;return}
-  if(/^h[2-4]$/.test(tag)){finish();current=blankRecipe(text);return}
-  if(!current)return;
-  if(tag==='table'){parseTable(el);return}
-  if(tag==='ul'||tag==='ol'){[...el.querySelectorAll('li')].forEach(li=>addText(li.textContent,'li'));return}
-  addText(text,tag)
- });finish();
- // Fallback for nonstandard Word documents
- if(!parsed.length){return null}
- return{parsed,warnings}
-}
-function parseWordRecipes(html,fileName){
- const structured=parseStandardWordRecipes(html,fileName);if(!structured)return parseWordRecipesLegacy(html,fileName);
- let count=0,newIngs=0,replaced=0;const warnings=[...structured.warnings];
- structured.parsed.forEach(item=>{const ingredients=[];item.ingredients.forEach(x=>{let ing=db.ingredients.find(i=>normHeader(i.name)===normHeader(x.name));if(!ing&&$('wordAutoIngredients')?.checked){ing={id:uid(),name:x.name,price:0,pack:1,unit:x.unit};db.ingredients.push(ing);db.inventory[ing.id]=0;newIngs++}if(ing)ingredients.push({ingredientId:ing.id,qty:x.qty})});if(!ingredients.length){warnings.push(`مواد «${item.name}» وارد نشد`);return}
-  const recipe={id:uid(),name:item.name,category:item.meta.category||'نامشخص',cup:item.meta.cup,time:item.meta.time,temp:item.meta.temp,allergens:item.meta.allergens,price:item.meta.price||0,salesQty:item.meta.salesQty||0,ingredients,steps:item.steps.length?item.steps:['مراحل تهیه در دفترچه ثبت نشده است؛ نیازمند تکمیل مدیر.']};
-  const existing=db.recipes.findIndex(r=>normHeader(r.name)===normHeader(item.name));
-  if(existing>=0&&$('wordReplace')?.checked){recipe.id=db.recipes[existing].id;recipe.price=recipe.price||db.recipes[existing].price||0;recipe.salesQty=recipe.salesQty||db.recipes[existing].salesQty||0;db.recipes[existing]=recipe;replaced++}
-  else if(existing<0)db.recipes.push(recipe);else{warnings.push(`«${item.name}» از قبل وجود داشت`);return}count++
- });
- if(replaced)warnings.unshift(`${replaced} رسپی ناقص قبلی جایگزین شد`);
- return{count,ingredients:newIngs,warnings}
-}
 function wordBlocksFromHtml(html){const doc=new DOMParser().parseFromString(html,'text/html');const blocks=[];let current=null;const children=[...doc.body.children];children.forEach(el=>{const tag=el.tagName.toLowerCase(),text=el.textContent.trim();if(!text)return;if(/^h[1-4]$/.test(tag)){if(current)blocks.push(current);current={title:text,lines:[]}}else{if(!current)current={title:'',lines:[]};if(tag==='table'){[...el.querySelectorAll('tr')].forEach(tr=>current.lines.push([...tr.querySelectorAll('th,td')].map(x=>x.textContent.trim()).filter(Boolean).join(' | ')))}else if(tag==='ul'||tag==='ol'){[...el.querySelectorAll('li')].forEach(li=>current.lines.push(li.textContent.trim()))}else current.lines.push(text)}});if(current)blocks.push(current);return blocks}
-function parseIngredientLine(line){let s=faToEnDigits(line).replace(/^[•\-–—*\d.\)]+\s*/,'').trim();let pipe=s.split('|').map(x=>x.trim()).filter(Boolean);if(pipe.length>=3&&cleanNumber(pipe[1])>0)return{name:pipe[0],qty:cleanNumber(pipe[1]),unit:normalizeWordUnit(pipe[2])};const m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(گرم|g|میلی\s*لیتر|میلی‌لیتر|ml|عدد|پیمانه|شات|قاشق)\s+(.+)/i)||s.match(/(.+?)\s*[:|]\s*([0-9]+(?:\.[0-9]+)?)\s*(گرم|g|میلی\s*لیتر|میلی‌لیتر|ml|عدد|پیمانه|شات|قاشق)/i);if(!m)return null;let qty,unit,name;if(/^\d/.test(m[1])){qty=cleanNumber(m[1]);unit=m[2];name=m[3]}else{name=m[1];qty=cleanNumber(m[2]);unit=m[3]}return{name:name.trim(),qty,unit:normalizeWordUnit(unit)}}
-function parseWordRecipesLegacy(html,fileName){const blocks=wordBlocksFromHtml(html);let count=0,newIngs=0;const warnings=[];blocks.forEach((b,idx)=>{const lines=b.lines.map(x=>x.trim()).filter(Boolean);let name=b.title.trim();if(!name){const first=lines.find(x=>/^(نام|عنوان)\s*(محصول|رسپی)?\s*[:：]/.test(x));if(first)name=first.split(/[:：]/).slice(1).join(':').trim()}if(!name&&blocks.length===1)name=fileName.replace(/\.docx$/i,'');if(!name)return;const meta={category:'',cup:'',time:'',temp:'',allergens:'',price:0,salesQty:0};let mode='';const ingredientLines=[],steps=[];lines.forEach(line=>{const n=normHeader(line);const val=line.split(/[:：]/).slice(1).join(':').trim();if(/^(مواداولیه|موادلازم|ترکیبات)/.test(n)){mode='ingredients';return}if(/^(مراحلتهیه|روش تهیه|دستورتهیه|طرزتهیه)/.test(line.replace(/[:：]/g,'').trim())){mode='steps';return}if(/^دسته/.test(line)){meta.category=val;return}if(/^(لیوان|سایز|حجم)/.test(line)){meta.cup=val;return}if(/^زمان/.test(line)){meta.time=val;return}if(/^(دما|درجه)/.test(line)){meta.temp=val;return}if(/^(آلرژن|حساسیت)/.test(line)){meta.allergens=val;return}if(/^(قیمتفروش|قیمت)/.test(n)){meta.price=cleanNumber(val);return}if(/^(تعدادفروش|فروشماهانه)/.test(n)){meta.salesQty=cleanNumber(val);return}const ing=parseIngredientLine(line);if(mode==='ingredients'||ing){if(ing)ingredientLines.push(ing);return}if(mode==='steps'||/^\d+[.\-)]/.test(faToEnDigits(line)))steps.push(line.replace(/^[\d۰-۹]+[.\-)]\s*/,''))});const valid=ingredientLines.filter(Boolean);if(!valid.length){warnings.push(`برای «${name}» ماده قابل تشخیص نبود`);return}const ingredients=[];valid.forEach(x=>{let ing=db.ingredients.find(i=>normHeader(i.name)===normHeader(x.name));if(!ing&&$('wordAutoIngredients')?.checked){ing={id:uid(),name:x.name,price:0,pack:1,unit:x.unit};db.ingredients.push(ing);db.inventory[ing.id]=0;newIngs++}if(ing)ingredients.push({ingredientId:ing.id,qty:x.qty})});if(!ingredients.length)return;const recipe={id:uid(),name,category:meta.category||'نامشخص',cup:meta.cup,time:meta.time,temp:meta.temp,allergens:meta.allergens,price:meta.price,salesQty:meta.salesQty,ingredients,steps:steps.length?steps:['مراحل تهیه از فایل Word استخراج نشد؛ نیازمند بازبینی است.']};const existing=db.recipes.findIndex(r=>normHeader(r.name)===normHeader(name));if(existing>=0&&$('wordReplace')?.checked){recipe.id=db.recipes[existing].id;db.recipes[existing]=recipe}else if(existing<0)db.recipes.push(recipe);else warnings.push(`«${name}» از قبل وجود داشت`);count++});return{count,ingredients:newIngs,warnings}}
-
+function parseIngredientLine(line){let s=faToEnDigits(line).replace(/^[•\-–—*\d.\)]+\s*/,'').trim();const m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(گرم|g|میلی\s*لیتر|میلی‌لیتر|ml|عدد|پیمانه|شات|قاشق)\s+(.+)/i)||s.match(/(.+?)\s*[:|]\s*([0-9]+(?:\.[0-9]+)?)\s*(گرم|g|میلی\s*لیتر|میلی‌لیتر|ml|عدد|پیمانه|شات|قاشق)/i);if(!m)return null;let qty,unit,name;if(/^\d/.test(m[1])){qty=cleanNumber(m[1]);unit=m[2];name=m[3]}else{name=m[1];qty=cleanNumber(m[2]);unit=m[3]}unit=unit.toLowerCase();if(unit==='g')unit='گرم';if(unit==='ml'||unit.includes('میلی'))unit='میلی‌لیتر';if(['پیمانه','شات','قاشق'].includes(unit))unit='عدد';return{name:name.trim(),qty,unit}}
+function parseWordRecipes(html,fileName){const blocks=wordBlocksFromHtml(html);let count=0,newIngs=0;const warnings=[];blocks.forEach((b,idx)=>{const lines=b.lines.map(x=>x.trim()).filter(Boolean);let name=b.title.trim();if(!name){const first=lines.find(x=>/^(نام|عنوان)\s*(محصول|رسپی)?\s*[:：]/.test(x));if(first)name=first.split(/[:：]/).slice(1).join(':').trim()}if(!name&&blocks.length===1)name=fileName.replace(/\.docx$/i,'');if(!name)return;const meta={category:'',cup:'',time:'',temp:'',allergens:'',price:0,salesQty:0};let mode='';const ingredientLines=[],steps=[];lines.forEach(line=>{const n=normHeader(line);const val=line.split(/[:：]/).slice(1).join(':').trim();if(/^(مواداولیه|موادلازم|ترکیبات)/.test(n)){mode='ingredients';return}if(/^(مراحلتهیه|روش تهیه|دستورتهیه|طرزتهیه)/.test(line.replace(/[:：]/g,'').trim())){mode='steps';return}if(/^دسته/.test(line)){meta.category=val;return}if(/^(لیوان|سایز|حجم)/.test(line)){meta.cup=val;return}if(/^زمان/.test(line)){meta.time=val;return}if(/^(دما|درجه)/.test(line)){meta.temp=val;return}if(/^(آلرژن|حساسیت)/.test(line)){meta.allergens=val;return}if(/^(قیمتفروش|قیمت)/.test(n)){meta.price=cleanNumber(val);return}if(/^(تعدادفروش|فروشماهانه)/.test(n)){meta.salesQty=cleanNumber(val);return}const ing=parseIngredientLine(line);if(mode==='ingredients'||ing){if(ing)ingredientLines.push(ing);else if(mode==='ingredients'&&line.length<80)ingredientLines.push(null);return}if(mode==='steps'||/^\d+[.\-)]/.test(faToEnDigits(line)))steps.push(line.replace(/^[\d۰-۹]+[.\-)]\s*/,''))});const valid=ingredientLines.filter(Boolean);if(!valid.length){warnings.push(`برای «${name}» ماده قابل تشخیص نبود`);return}const ingredients=[];valid.forEach(x=>{let ing=db.ingredients.find(i=>normHeader(i.name)===normHeader(x.name));if(!ing&&$('wordAutoIngredients')?.checked){ing={id:uid(),name:x.name,price:0,pack:1,unit:x.unit};db.ingredients.push(ing);db.inventory[ing.id]=0;newIngs++}if(ing)ingredients.push({ingredientId:ing.id,qty:x.qty})});if(!ingredients.length)return;const recipe={id:uid(),name,category:meta.category||'نامشخص',cup:meta.cup,time:meta.time,temp:meta.temp,allergens:meta.allergens,price:meta.price,salesQty:meta.salesQty,ingredients,steps:steps.length?steps:['مراحل تهیه از فایل Word استخراج نشد؛ نیازمند بازبینی است.']};const existing=db.recipes.findIndex(r=>normHeader(r.name)===normHeader(name));if(existing>=0&&$('wordReplace')?.checked)db.recipes[existing]=recipe;else if(existing<0)db.recipes.push(recipe);else warnings.push(`«${name}» از قبل وجود داشت`);count++});return{count,ingredients:newIngs,warnings}}
 
 async function importExcelFiles(files){
  if(!files?.length)return;

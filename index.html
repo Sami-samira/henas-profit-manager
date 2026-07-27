@@ -85,9 +85,56 @@
     @media(max-width:900px){.finance-kpis{grid-template-columns:repeat(2,1fr)}.filter-bar{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:600px){.finance-kpis{grid-template-columns:1fr 1fr}.filter-bar{grid-template-columns:1fr}.customer-head{align-items:flex-start;flex-direction:column}}
 
-  </style>
+  
+    .role-gate{position:fixed;inset:0;background:rgba(5,5,5,.96);z-index:120;display:flex;align-items:center;justify-content:center;padding:18px}
+    .role-gate.hidden{display:none}
+    .role-card{width:min(860px,100%);background:#1b1b1b;border:1px solid #4a4a4a;border-radius:24px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.45)}
+    .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+    .role-option{background:#121212;border:1px solid #3d3d3d;border-radius:18px;padding:18px;text-align:right}
+    .role-option h3{margin:0 0 8px}.role-option p{color:#aaa;line-height:1.8}
+    .role-badge{display:inline-block;padding:5px 10px;border-radius:999px;background:#303030;font-size:12px}
+    .panel-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#161616;border:1px solid #3c3c3c;border-radius:17px;padding:13px 15px;margin-bottom:12px}
+    .attendance-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:12px}
+    .attendance-kpi{background:#151515;border:1px solid #393939;border-radius:16px;padding:14px}
+    .attendance-kpi small{color:#aaa}.attendance-kpi strong{display:block;font-size:23px;margin-top:7px}
+    .status-pending{color:#e2b36f}.status-approved{color:#b6d7ab}.status-rejected{color:#e58a8a}
+    .staff-chip{display:inline-block;padding:5px 9px;border-radius:999px;background:#2c2c2c;font-size:11px}
+    .staff-chip.pending{background:#4c3a22}.staff-chip.approved{background:#29412c}.staff-chip.rejected{background:#4b2929}
+    .salary-sheet{background:#131313;border:1px solid #3d3d3d;border-radius:17px;padding:16px}
+    .salary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .salary-box{background:#1c1c1c;border:1px solid #363636;border-radius:13px;padding:12px}
+    .salary-box small{color:#aaa}.salary-box strong{display:block;margin-top:5px}
+    .request-card{background:#141414;border:1px solid #373737;border-radius:14px;padding:12px;margin-bottom:9px}
+    @media(max-width:800px){.role-grid{grid-template-columns:1fr}.attendance-kpis{grid-template-columns:1fr 1fr}.salary-grid{grid-template-columns:1fr 1fr}}
+
+</style>
 </head>
 <body>
+
+<div class="role-gate" id="roleGate">
+  <div class="role-card">
+    <div class="brand"><div class="logo">H</div><div><h1 style="margin:0">ورود به Henas Cafe OS</h1><small>نوع پنل را انتخاب کنید</small></div></div>
+    <div class="role-grid">
+      <div class="role-option">
+        <span class="role-badge">پرسنل</span>
+        <h3>پنل پرسنل</h3>
+        <p>ثبت دستی ورود و خروج، مشاهده سوابق خود و ارسال درخواست اصلاح.</p>
+        <select id="gateEmployee"></select>
+        <input id="gateEmployeePin" type="password" inputmode="numeric" placeholder="PIN پرسنل" style="margin-top:8px">
+        <button class="btn good" style="width:100%;margin-top:10px" onclick="enterPersonnelPanel()">ورود پرسنل</button>
+      </div>
+      <div class="role-option">
+        <span class="role-badge">مدیریت</span>
+        <h3>پنل مدیر</h3>
+        <p>تأیید کارکرد، تعریف پرسنل و شیفت، محاسبه تارگت، حقوق و مزایا.</p>
+        <input id="gateManagerPin" type="password" inputmode="numeric" placeholder="PIN مدیر">
+        <button class="btn primary" style="width:100%;margin-top:10px" onclick="enterManagerPanel()">ورود مدیر</button>
+        <div style="color:#888;font-size:11px;margin-top:8px">PIN اولیه مدیر: ۱۴۰۳</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="app">
 <header>
   <div class="brand">
@@ -231,6 +278,100 @@
   </section>
 
 
+
+<section class="page" data-page="staff">
+  <div class="panel-banner">
+    <div><strong id="staffPanelTitle">پنل پرسنل</strong><div style="color:#aaa;font-size:12px" id="staffPanelSubtitle"></div></div>
+    <button class="btn" onclick="logoutRole()">تغییر پنل</button>
+  </div>
+
+  <div id="personnelPanel">
+    <div class="attendance-kpis">
+      <div class="attendance-kpi"><small>کارکرد تأییدشده ماه</small><strong id="empApprovedHours">۰ ساعت</strong></div>
+      <div class="attendance-kpi"><small>اضافه‌کاری تأییدشده</small><strong id="empOvertime">۰ ساعت</strong></div>
+      <div class="attendance-kpi"><small>روزهای عبور از تارگت</small><strong id="empTargetDays">۰</strong></div>
+      <div class="attendance-kpi"><small>وضعیت آخرین ثبت</small><strong id="empLastStatus">-</strong></div>
+    </div>
+    <div class="grid">
+      <div class="card span5">
+        <h2>ثبت دستی ورود و خروج</h2>
+        <div class="form two">
+          <div><label>تاریخ</label><input id="aDate" type="date"></div>
+          <div><label>شیفت</label><select id="aShift"><option value="morning">صبح ۰۶:۰۰ تا ۱۴:۰۰</option><option value="evening">عصر ۱۴:۰۰ تا ۲۲:۰۰</option><option value="custom">سفارشی</option></select></div>
+          <div><label>ساعت ورود</label><input id="aIn" type="time"></div>
+          <div><label>ساعت خروج</label><input id="aOut" type="time"></div>
+          <div><label>استراحت (دقیقه)</label><input id="aBreak" type="number" value="0"></div>
+          <div><label>فروش شیفت (تومان)</label><input id="aSales" type="number" placeholder="اختیاری"></div>
+        </div>
+        <div><label>توضیحات</label><textarea id="aNote" placeholder="دلیل تأخیر، خروج زودهنگام یا توضیح کارکرد"></textarea></div>
+        <div class="actions"><button class="btn good" onclick="submitAttendance()">ارسال برای تأیید مدیر</button></div>
+      </div>
+      <div class="card span7">
+        <h2>سوابق ثبت‌شده من</h2>
+        <div class="table-wrap"><table id="myAttendanceTable"></table></div>
+      </div>
+      <div class="card span12">
+        <h2>درخواست اصلاح</h2>
+        <div class="form">
+          <div><label>رکورد</label><select id="correctionAttendance"></select></div>
+          <div><label>ورود پیشنهادی</label><input id="correctionIn" type="time"></div>
+          <div><label>خروج پیشنهادی</label><input id="correctionOut" type="time"></div>
+          <div><label>دلیل</label><input id="correctionReason"></div>
+        </div>
+        <div class="actions"><button class="btn warn" onclick="submitCorrection()">ارسال درخواست اصلاح</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="managerPanel" style="display:none">
+    <div class="attendance-kpis">
+      <div class="attendance-kpi"><small>در انتظار تأیید</small><strong id="mgrPending">۰</strong></div>
+      <div class="attendance-kpi"><small>کارکرد تأییدشده ماه</small><strong id="mgrApprovedHours">۰ ساعت</strong></div>
+      <div class="attendance-kpi"><small>اضافه‌کاری ماه</small><strong id="mgrOvertime">۰ ساعت</strong></div>
+      <div class="attendance-kpi"><small>پاداش تارگت</small><strong id="mgrTargetBonus">۰ تومان</strong></div>
+    </div>
+
+    <div class="grid">
+      <div class="card span5">
+        <h2>تعریف پرسنل</h2>
+        <div class="form two">
+          <div><label>نام و نام خانوادگی</label><input id="empName"></div>
+          <div><label>سمت</label><input id="empRole" placeholder="باریستا"></div>
+          <div><label>PIN</label><input id="empPin" inputmode="numeric"></div>
+          <div><label>حقوق ثابت ماهانه</label><input id="empBaseSalary" type="number"></div>
+          <div><label>نرخ اضافه‌کاری ساعتی</label><input id="empOvertimeRate" type="number" value="62500"></div>
+          <div><label>تارگت روزانه</label><input id="empTarget" type="number" value="4250000"></div>
+          <div><label>پاداش عبور از تارگت</label><input id="empTargetBonus" type="number" value="200000"></div>
+          <div><label>ساعت موظفی روزانه</label><input id="empDailyHours" type="number" value="8"></div>
+        </div>
+        <div class="actions"><button class="btn good" onclick="addEmployee()">ثبت پرسنل</button></div>
+        <div id="employeeCards"></div>
+      </div>
+
+      <div class="card span7">
+        <div class="section-title"><h2>صف تأیید کارکرد</h2><button class="btn" onclick="approveAllPending()">تأیید همه</button></div>
+        <div class="table-wrap"><table id="managerAttendanceTable"></table></div>
+      </div>
+
+      <div class="card span12">
+        <div class="section-title"><h2>محاسبه حقوق و کارکرد</h2><button class="btn" onclick="printPayroll()">چاپ گزارش</button></div>
+        <div class="form">
+          <div><label>پرسنل</label><select id="payrollEmployee" onchange="renderPayroll()"></select></div>
+          <div><label>ماه</label><input id="payrollMonth" type="month" onchange="renderPayroll()"></div>
+          <div><label>مزایا</label><input id="payrollBenefits" type="number" value="0" oninput="renderPayroll()"></div>
+          <div><label>کسورات / مساعده</label><input id="payrollDeductions" type="number" value="0" oninput="renderPayroll()"></div>
+        </div>
+        <div id="payrollOutput" class="salary-sheet" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card span12">
+        <h2>درخواست‌های اصلاح پرسنل</h2>
+        <div id="correctionRequests"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
   <section class="page" data-page="accounts">
     <div class="hero">
       <div class="hero-top">
@@ -349,7 +490,7 @@
         </div>
         <div class="import-options">
           <label><input id="wordAutoIngredients" type="checkbox" checked style="width:auto"> ساخت خودکار مواد اولیه ناشناخته</label>
-          <label><input id="wordReplace" type="checkbox" checked style="width:auto"> جایگزینی خودکار رسپی ناقص هم‌نام</label>
+          <label><input id="wordReplace" type="checkbox" style="width:auto"> جایگزینی رسپی هم‌نام</label>
         </div>
         <p style="color:#aaa;font-size:12px">بهترین نتیجه زمانی است که نام هر محصول Heading باشد و بخش‌ها با «مواد اولیه»، «مراحل تهیه»، «لیوان»، «دما» و «آلرژن» مشخص شده باشند.</p>
       </div>
