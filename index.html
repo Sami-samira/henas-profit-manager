@@ -107,6 +107,11 @@
     .request-card{background:#141414;border:1px solid #373737;border-radius:14px;padding:12px;margin-bottom:9px}
     @media(max-width:800px){.role-grid{grid-template-columns:1fr}.attendance-kpis{grid-template-columns:1fr 1fr}.salary-grid{grid-template-columns:1fr 1fr}}
 
+
+.purchase-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:13px}
+.purchase-kpi{background:#151515;border:1px solid #393939;border-radius:16px;padding:14px}
+.purchase-kpi small{color:#aaa}.purchase-kpi strong{display:block;font-size:22px;margin-top:7px}
+@media(max-width:850px){.purchase-kpis{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -278,6 +283,50 @@
   </section>
 
 
+
+
+<section class="page" data-page="purchases">
+  <div class="hero"><div class="hero-top"><div><h2>خرید و میانگین موزون موجودی</h2><p>هر فاکتور خرید را جداگانه ثبت کنید تا قیمت واقعی مواد و بهای تمام‌شده رسپی‌ها درست محاسبه شود.</p></div><div class="hero-orb">📦</div></div></div>
+  <div class="purchase-kpis">
+    <div class="purchase-kpi"><small>ارزش موجودی</small><strong id="inventoryValueKpi">۰</strong></div>
+    <div class="purchase-kpi"><small>خرید این ماه</small><strong id="monthPurchaseKpi">۰</strong></div>
+    <div class="purchase-kpi"><small>فاکتور این ماه</small><strong id="monthInvoiceCountKpi">۰</strong></div>
+    <div class="purchase-kpi"><small>بیشترین افزایش قیمت</small><strong id="maxPriceIncreaseKpi">-</strong></div>
+  </div>
+  <div class="grid">
+    <div class="card span5">
+      <h2>ثبت فاکتور خرید</h2>
+      <div class="form two">
+        <div><label>شماره فاکتور</label><input id="puInvoiceNo"></div>
+        <div><label>تأمین‌کننده</label><input id="puSupplier"></div>
+        <div><label>تاریخ</label><input id="puDate" type="date"></div>
+        <div><label>ماده اولیه</label><select id="puIngredient"></select></div>
+        <div><label>مقدار خرید</label><input id="puQty" type="number"></div>
+        <div><label>واحد مقدار</label><select id="puQtyUnit"><option value="base">واحد اصلی ماده</option><option value="kg">کیلوگرم</option><option value="liter">لیتر</option><option value="count">عدد</option></select></div>
+        <div><label>قیمت خرید</label><input id="puUnitPrice" type="number"></div>
+        <div><label>قیمت برای</label><select id="puPriceUnit"><option value="entered">کل مقدار واردشده</option><option value="kg">هر کیلوگرم</option><option value="liter">هر لیتر</option><option value="count">هر عدد</option></select></div>
+        <div><label>تخفیف</label><input id="puDiscount" type="number" value="0"></div>
+        <div><label>حمل و سایر</label><input id="puExtraCost" type="number" value="0"></div>
+      </div>
+      <div><label>توضیحات</label><textarea id="puNote"></textarea></div>
+      <div class="actions"><button class="btn good" onclick="addPurchaseInvoice()">ثبت فاکتور</button></div>
+    </div>
+    <div class="card span7"><div class="section-title"><h2>موجودی و میانگین موزون</h2><button class="btn" onclick="exportPurchasesExcel()">خروجی Excel</button></div><div class="table-wrap"><table id="weightedInventoryTable"></table></div></div>
+    <div class="card span12">
+      <h2>تاریخچه فاکتورها</h2>
+      <div class="filter-bar">
+        <input id="purchaseFilterDate" type="month" onchange="renderPurchasesModule()">
+        <select id="purchaseFilterIngredient" onchange="renderPurchasesModule()"></select>
+        <input id="purchaseFilterSupplier" placeholder="تأمین‌کننده" oninput="renderPurchasesModule()">
+        <input id="purchaseFilterInvoice" placeholder="شماره فاکتور" oninput="renderPurchasesModule()">
+        <button class="btn danger" onclick="clearPurchaseFilters()">پاک‌کردن فیلتر</button>
+      </div>
+      <div class="table-wrap"><table id="purchasesTable"></table></div>
+    </div>
+    <div class="card span6"><h2>تحلیل قیمت خرید</h2><div id="purchaseInsights"></div></div>
+    <div class="card span6"><h2>اثر بر بهای رسپی</h2><div id="recipeCostImpact"></div></div>
+  </div>
+</section>
 
 <section class="page" data-page="staff">
   <div class="panel-banner">

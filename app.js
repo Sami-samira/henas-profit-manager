@@ -26,12 +26,13 @@ db.employees=Array.isArray(db.employees)&&db.employees.length?db.employees:[
 ];
 db.attendance=Array.isArray(db.attendance)?db.attendance:[];
 db.correctionRequests=Array.isArray(db.correctionRequests)?db.correctionRequests:[];
+db.purchaseInvoices=Array.isArray(db.purchaseInvoices)?db.purchaseInvoices:[];
 db.appSecurity=db.appSecurity||{managerPin:"1403"};
 let activeRole=sessionStorage.getItem("henasRole")||"";
 let activeEmployeeId=Number(sessionStorage.getItem("henasEmployeeId")||0);
 let recipeDraft=[];
 let lastBotAnswer="";
-const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["staff","پرسنل"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
+const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["purchases","خرید و انبار"],["staff","پرسنل"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
 const $=id=>document.getElementById(id);
 function money(n){return Math.round(Number(n)||0).toLocaleString("fa-IR")+" تومان"}
 function num(n){return (Number(n)||0).toLocaleString("fa-IR",{maximumFractionDigits:1})}
@@ -81,7 +82,7 @@ function saveRecipe(){
 }
 function deleteRecipe(id){db.recipes=db.recipes.filter(x=>x.id!==id);save()}
 
-function recipeCost(r){return r.ingredients.reduce((s,x)=>s+unitCost(db.ingredients.find(i=>i.id===x.ingredientId))*x.qty,0)}
+function recipeCost(r){return r.ingredients.reduce((s,x)=>{const i=db.ingredients.find(z=>z.id===x.ingredientId);const c=(db.purchaseInvoices||[]).some(p=>p.ingredientId===x.ingredientId)?weightedIngredientUnitCost(x.ingredientId):unitCost(i);return s+c*x.qty},0)}
 function renderRecipeCards(){
  const q=($("recipeSearch")?.value||"").trim().toLowerCase();
  const list=db.recipes.filter(r=>!q||r.name.toLowerCase().includes(q)||r.category.includes(q));
@@ -216,10 +217,79 @@ function renderDashboard(m){
  const gap=db.settings.targetProfit-m.net,con=1-m.variableRate,extra=gap>0&&con>0?gap/con:0;$("extraSales").textContent=money(extra);$("extraDaily").textContent=money(extra/db.settings.workDays);
  const d=db.recipes.map(r=>({name:r.name,sales:r.price*r.salesQty,profit:(r.price-recipeCost(r))*r.salesQty}));renderChart("profitChart",d,"profit");renderChart("salesChart",d,"sales");
 }
-function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();fillRoleGate()}
+function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();renderPurchasesModule();fillRoleGate()}
 
 
 
+
+
+// ================= Purchase & Weighted Average =================
+function basePurchaseQty(qty,unit){
+ qty=+qty||0;
+ return (unit==='kg'||unit==='liter')?qty*1000:qty
+}
+function addPurchaseInvoice(){
+ const ingredientId=+$('puIngredient').value,i=db.ingredients.find(x=>x.id===ingredientId);
+ const qty=+$('puQty').value,price=cleanNumber($('puUnitPrice').value);
+ if(!i||qty<=0||price<=0)return alert('ماده، مقدار و قیمت خرید را کامل کنید.');
+ const baseQty=basePurchaseQty(qty,$('puQtyUnit').value);
+ let gross;
+ const pu=$('puPriceUnit').value;
+ if(pu==='kg'||pu==='liter')gross=baseQty/1000*price;
+ else if(pu==='count')gross=baseQty*price;
+ else gross=price;
+ const totalCost=Math.max(0,gross-cleanNumber($('puDiscount').value)+cleanNumber($('puExtraCost').value));
+ db.purchaseInvoices.push({id:uid(),invoiceNo:$('puInvoiceNo').value.trim(),supplier:$('puSupplier').value.trim(),date:$('puDate').value||localISODate(),ingredientId,ingredientName:i.name,baseQty,totalCost,note:$('puNote').value.trim(),createdAt:new Date().toISOString()});
+ db.inventory[ingredientId]=(+db.inventory[ingredientId]||0)+baseQty;
+ ['puInvoiceNo','puSupplier','puQty','puUnitPrice','puNote'].forEach(id=>$(id).value='');
+ $('puDiscount').value=0;$('puExtraCost').value=0;save()
+}
+function purchaseUnitCost(p){return p.baseQty?p.totalCost/p.baseQty:0}
+function weightedInfo(id){
+ const rows=db.purchaseInvoices.filter(p=>p.ingredientId===id);
+ const qty=rows.reduce((s,p)=>s+p.baseQty,0),cost=rows.reduce((s,p)=>s+p.totalCost,0);
+ const fallback=unitCost(db.ingredients.find(i=>i.id===id));
+ const avg=qty?cost/qty:fallback,stock=+db.inventory[id]||0;
+ const prices=rows.map(purchaseUnitCost).filter(Boolean);
+ return{rows,qty,cost,avg,stock,value:stock*avg,last:prices.at(-1)||0,min:prices.length?Math.min(...prices):0,max:prices.length?Math.max(...prices):0}
+}
+function weightedIngredientUnitCost(id){return weightedInfo(id).avg}
+function deletePurchaseInvoice(id){
+ const p=db.purchaseInvoices.find(x=>x.id===id);if(!p||!confirm('فاکتور حذف شود؟'))return;
+ db.inventory[p.ingredientId]=Math.max(0,(+db.inventory[p.ingredientId]||0)-p.baseQty);
+ db.purchaseInvoices=db.purchaseInvoices.filter(x=>x.id!==id);save()
+}
+function clearPurchaseFilters(){['purchaseFilterDate','purchaseFilterSupplier','purchaseFilterInvoice'].forEach(id=>$(id).value='');$('purchaseFilterIngredient').value='';renderPurchasesModule()}
+function renderPurchasesModule(){
+ if(!$('inventoryValueKpi'))return;
+ if(!$('puDate').value)$('puDate').value=localISODate();
+ $('puIngredient').innerHTML=db.ingredients.map(i=>`<option value="${i.id}">${esc(i.name)} (${i.unit})</option>`).join('');
+ $('purchaseFilterIngredient').innerHTML='<option value="">همه مواد</option>'+db.ingredients.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('');
+ const infos=db.ingredients.map(i=>({i,x:weightedInfo(i.id)}));
+ $('weightedInventoryTable').innerHTML='<tr><th>ماده</th><th>موجودی</th><th>میانگین موزون</th><th>ارزش موجودی</th><th>آخرین</th><th>کمترین/بیشترین</th></tr>'+infos.map(o=>`<tr><td>${esc(o.i.name)}</td><td>${num(o.x.stock)} ${o.i.unit}</td><td>${money(o.x.avg)}</td><td>${money(o.x.value)}</td><td>${money(o.x.last)}</td><td>${money(o.x.min)} / ${money(o.x.max)}</td></tr>`).join('');
+ const month=localISODate().slice(0,7),mr=db.purchaseInvoices.filter(p=>p.date.startsWith(month));
+ $('inventoryValueKpi').textContent=money(infos.reduce((s,o)=>s+o.x.value,0));
+ $('monthPurchaseKpi').textContent=money(mr.reduce((s,p)=>s+p.totalCost,0));
+ $('monthInvoiceCountKpi').textContent=num(mr.length);
+ let top=null;
+ db.ingredients.forEach(i=>{const ps=weightedInfo(i.id).rows.map(purchaseUnitCost);if(ps.length>1){const pct=(ps.at(-1)-ps.at(-2))/ps.at(-2)*100;if(!top||pct>top.pct)top={name:i.name,pct}}});
+ $('maxPriceIncreaseKpi').textContent=top?`${top.name} ${num(top.pct)}٪`:'-';
+ const mf=$('purchaseFilterDate').value,ig=+$('purchaseFilterIngredient').value,sf=normHeader($('purchaseFilterSupplier').value),nf=normHeader($('purchaseFilterInvoice').value);
+ const rows=db.purchaseInvoices.filter(p=>(!mf||p.date.startsWith(mf))&&(!ig||p.ingredientId===ig)&&(!sf||normHeader(p.supplier).includes(sf))&&(!nf||normHeader(p.invoiceNo).includes(nf))).sort((a,b)=>(b.date+b.createdAt).localeCompare(a.date+a.createdAt));
+ $('purchasesTable').innerHTML='<tr><th>تاریخ</th><th>فاکتور</th><th>تأمین‌کننده</th><th>ماده</th><th>مقدار</th><th>هزینه کل</th><th>قیمت واحد پایه</th><th></th></tr>'+rows.map(p=>{const i=db.ingredients.find(x=>x.id===p.ingredientId);return `<tr><td>${p.date}</td><td>${esc(p.invoiceNo||'-')}</td><td>${esc(p.supplier||'-')}</td><td>${esc(p.ingredientName)}</td><td>${num(p.baseQty)} ${i?.unit||''}</td><td>${money(p.totalCost)}</td><td>${money(purchaseUnitCost(p))}</td><td><button class="btn danger" onclick="deletePurchaseInvoice(${p.id})">حذف</button></td></tr>`}).join('');
+ const ins=[];
+ db.ingredients.forEach(i=>{const x=weightedInfo(i.id),ps=x.rows.map(purchaseUnitCost);if(ps.length>1){const pct=(ps.at(-1)-ps.at(-2))/ps.at(-2)*100;if(Math.abs(pct)>=5)ins.push(`<div class="insight ${pct>0?'high':'low'}"><h4>${esc(i.name)}</h4><p>آخرین قیمت نسبت به فاکتور قبلی ${pct>0?'افزایش':'کاهش'} داشته است.</p><p class="impact">${num(Math.abs(pct))}٪</p></div>`)}});
+ $('purchaseInsights').innerHTML=ins.join('')||'<div class="empty">حداقل دو فاکتور برای یک ماده ثبت کنید.</div>';
+ const impacts=[];
+ db.recipes.forEach(r=>{const old=r.ingredients.reduce((s,x)=>s+unitCost(db.ingredients.find(i=>i.id===x.ingredientId))*x.qty,0),nw=r.ingredients.reduce((s,x)=>s+weightedInfo(x.ingredientId).avg*x.qty,0);if(Math.abs(nw-old)>=100)impacts.push({name:r.name,old,nw,d:nw-old})});
+ $('recipeCostImpact').innerHTML=impacts.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,10).map(x=>`<div class="insight ${x.d>0?'high':'low'}"><h4>${esc(x.name)}</h4><p>بهای قبلی ${money(x.old)} → بهای جدید ${money(x.nw)}</p><p class="impact">${x.d>0?'+':''}${money(x.d)}</p></div>`).join('')||'<div class="empty">اثری ثبت نشده است.</div>'
+}
+function exportPurchasesExcel(){
+ if(typeof XLSX==='undefined')return alert('کتابخانه Excel بارگذاری نشده است.');
+ const rows=db.purchaseInvoices.map(p=>({'تاریخ':p.date,'شماره فاکتور':p.invoiceNo,'تأمین‌کننده':p.supplier,'ماده':p.ingredientName,'مقدار پایه':p.baseQty,'هزینه کل':p.totalCost,'قیمت واحد پایه':purchaseUnitCost(p),'توضیحات':p.note}));
+ const inv=db.ingredients.map(i=>{const x=weightedInfo(i.id);return {'ماده':i.name,'واحد':i.unit,'موجودی':x.stock,'میانگین موزون':x.avg,'ارزش موجودی':x.value,'آخرین قیمت':x.last,'کمترین':x.min,'بیشترین':x.max}});
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'فاکتورها');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(inv),'موجودی');XLSX.writeFile(wb,'خرید_و_میانگین_موزون_هناس.xlsx')
+}
 
 // ================= Personnel / Manager Panels =================
 function minutesBetween(start,end){
