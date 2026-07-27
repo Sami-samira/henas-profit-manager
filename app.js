@@ -219,7 +219,93 @@ function wordBlocksFromHtml(html){const doc=new DOMParser().parseFromString(html
 function parseIngredientLine(line){let s=faToEnDigits(line).replace(/^[•\-–—*\d.\)]+\s*/,'').trim();const m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*(گرم|g|میلی\s*لیتر|میلی‌لیتر|ml|عدد|پیمانه|شات|قاشق)\s+(.+)/i)||s.match(/(.+?)\s*[:|]\s*([0-9]+(?:\.[0-9]+)?)\s*(گرم|g|میلی\s*لیتر|میلی‌لیتر|ml|عدد|پیمانه|شات|قاشق)/i);if(!m)return null;let qty,unit,name;if(/^\d/.test(m[1])){qty=cleanNumber(m[1]);unit=m[2];name=m[3]}else{name=m[1];qty=cleanNumber(m[2]);unit=m[3]}unit=unit.toLowerCase();if(unit==='g')unit='گرم';if(unit==='ml'||unit.includes('میلی'))unit='میلی‌لیتر';if(['پیمانه','شات','قاشق'].includes(unit))unit='عدد';return{name:name.trim(),qty,unit}}
 function parseWordRecipes(html,fileName){const blocks=wordBlocksFromHtml(html);let count=0,newIngs=0;const warnings=[];blocks.forEach((b,idx)=>{const lines=b.lines.map(x=>x.trim()).filter(Boolean);let name=b.title.trim();if(!name){const first=lines.find(x=>/^(نام|عنوان)\s*(محصول|رسپی)?\s*[:：]/.test(x));if(first)name=first.split(/[:：]/).slice(1).join(':').trim()}if(!name&&blocks.length===1)name=fileName.replace(/\.docx$/i,'');if(!name)return;const meta={category:'',cup:'',time:'',temp:'',allergens:'',price:0,salesQty:0};let mode='';const ingredientLines=[],steps=[];lines.forEach(line=>{const n=normHeader(line);const val=line.split(/[:：]/).slice(1).join(':').trim();if(/^(مواداولیه|موادلازم|ترکیبات)/.test(n)){mode='ingredients';return}if(/^(مراحلتهیه|روش تهیه|دستورتهیه|طرزتهیه)/.test(line.replace(/[:：]/g,'').trim())){mode='steps';return}if(/^دسته/.test(line)){meta.category=val;return}if(/^(لیوان|سایز|حجم)/.test(line)){meta.cup=val;return}if(/^زمان/.test(line)){meta.time=val;return}if(/^(دما|درجه)/.test(line)){meta.temp=val;return}if(/^(آلرژن|حساسیت)/.test(line)){meta.allergens=val;return}if(/^(قیمتفروش|قیمت)/.test(n)){meta.price=cleanNumber(val);return}if(/^(تعدادفروش|فروشماهانه)/.test(n)){meta.salesQty=cleanNumber(val);return}const ing=parseIngredientLine(line);if(mode==='ingredients'||ing){if(ing)ingredientLines.push(ing);else if(mode==='ingredients'&&line.length<80)ingredientLines.push(null);return}if(mode==='steps'||/^\d+[.\-)]/.test(faToEnDigits(line)))steps.push(line.replace(/^[\d۰-۹]+[.\-)]\s*/,''))});const valid=ingredientLines.filter(Boolean);if(!valid.length){warnings.push(`برای «${name}» ماده قابل تشخیص نبود`);return}const ingredients=[];valid.forEach(x=>{let ing=db.ingredients.find(i=>normHeader(i.name)===normHeader(x.name));if(!ing&&$('wordAutoIngredients')?.checked){ing={id:uid(),name:x.name,price:0,pack:1,unit:x.unit};db.ingredients.push(ing);db.inventory[ing.id]=0;newIngs++}if(ing)ingredients.push({ingredientId:ing.id,qty:x.qty})});if(!ingredients.length)return;const recipe={id:uid(),name,category:meta.category||'نامشخص',cup:meta.cup,time:meta.time,temp:meta.temp,allergens:meta.allergens,price:meta.price,salesQty:meta.salesQty,ingredients,steps:steps.length?steps:['مراحل تهیه از فایل Word استخراج نشد؛ نیازمند بازبینی است.']};const existing=db.recipes.findIndex(r=>normHeader(r.name)===normHeader(name));if(existing>=0&&$('wordReplace')?.checked)db.recipes[existing]=recipe;else if(existing<0)db.recipes.push(recipe);else warnings.push(`«${name}» از قبل وجود داشت`);count++});return{count,ingredients:newIngs,warnings}}
 
-async function importExcelFiles(files){if(!files?.length)return;if(typeof XLSX==='undefined'){addLog('error','کتابخانه Excel بارگذاری نشده','اتصال اینترنت را بررسی و صفحه را دوباره باز کنید.');return}for(const file of [...files]){try{const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array',cellDates:true});let totals={ingredients:0,recipes:0,sales:0,expenses:0,inventory:0,wastes:0};for(const sheetName of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{defval:'',raw:false});if(!rows.length)continue;const kind=detectSheetKind(sheetName,rows[0]);const n=importSheetRows(kind,rows);if(kind)totals[kind]+=n;importState.preview=rows.slice(0,10)}addLog('success',file.name,`مواد: ${totals.ingredients} | رسپی: ${totals.recipes} | فروش: ${totals.sales} | هزینه: ${totals.expenses} | موجودی: ${totals.inventory} | پرت: ${totals.wastes}`)}catch(e){addLog('error',file.name,e.message||'خواندن Excel ناموفق بود.')}}save()}
+async function importExcelFiles(files){
+ if(!files?.length)return;
+ if(typeof XLSX==='undefined'){addLog('error','کتابخانه Excel بارگذاری نشده','اتصال اینترنت را بررسی و صفحه را دوباره باز کنید.');return}
+ importExcelFiles.cleared=new Set();
+ for(const file of [...files]){
+  try{
+   const data=await file.arrayBuffer();
+   const wb=XLSX.read(data,{type:'array',cellDates:true});
+   let totals={ingredients:0,recipes:0,sales:0,expenses:0,inventory:0,wastes:0,posMatched:0,posCreated:0,posUnmatched:0};
+   for(const sheetName of wb.SheetNames){
+    const sheet=wb.Sheets[sheetName];
+    const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+    if(!matrix.length)continue;
+    if(isPosMatrix(sheetName,matrix)){
+      const result=importPosMatrix(matrix);
+      totals.sales+=result.imported;
+      totals.posMatched+=result.matched;
+      totals.posCreated+=result.created;
+      totals.posUnmatched+=result.unmatched;
+      importState.preview=matrix.slice(0,10).map(r=>({'نام محصول':r[0],'تعداد':r[1],'قیمت واحد':r[2],'مبلغ کل':r[3]}));
+      continue;
+    }
+    const rows=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
+    if(!rows.length)continue;
+    const kind=detectSheetKind(sheetName,rows[0]);
+    const n=importSheetRows(kind,rows);
+    if(kind)totals[kind]+=n;
+    importState.preview=rows.slice(0,10);
+   }
+   const posText=(totals.posMatched||totals.posCreated||totals.posUnmatched)?` | پوز: ${totals.posMatched} تطبیق، ${totals.posCreated} محصول جدید، ${totals.posUnmatched} ردیف نامعتبر`:'';
+   addLog('success',file.name,`مواد: ${totals.ingredients} | رسپی: ${totals.recipes} | فروش: ${totals.sales} | هزینه: ${totals.expenses} | موجودی: ${totals.inventory} | پرت: ${totals.wastes}${posText}`)
+  }catch(e){addLog('error',file.name,e.message||'خواندن Excel ناموفق بود.')}
+ }
+ save()
+}
+function canonicalProductName(v){
+ let s=normHeader(v).replace(/٪/g,'').replace(/درصد/g,'');
+ s=s.replace(/۷۰۳۰|7030/g,'70/30').replace(/۵۰۵۰|5050/g,'50/50');
+ s=s.replace(/کافهلاته/g,'لاته').replace(/کافهالتّه/g,'لاته').replace(/آیسالتّه/g,'آیسلاته');
+ s=s.replace(/اسپرسودبل/g,'اسپرسو').replace(/کلاسیک|کالسیک/g,'');
+ return s;
+}
+function tokenSimilarity(a,b){
+ const aa=canonicalProductName(a),bb=canonicalProductName(b);
+ if(aa===bb)return 100;
+ if(aa.includes(bb)||bb.includes(aa))return 85;
+ const ta=new Set(aa.split(/[^\p{L}\p{N}/]+/u).filter(Boolean)),tb=new Set(bb.split(/[^\p{L}\p{N}/]+/u).filter(Boolean));
+ let inter=0;ta.forEach(x=>{if(tb.has(x))inter++});
+ return inter/Math.max(ta.size,tb.size,1)*70;
+}
+function findRecipeForPos(name){
+ let best=null,score=0;
+ db.recipes.forEach(r=>{const s=tokenSimilarity(name,r.name);if(s>score){score=s;best=r}});
+ return score>=55?best:null;
+}
+function isPosMatrix(sheetName,matrix){
+ const n=normHeader(sheetName);
+ if(/پوز|pos|فروش دستگاه|صندوق/.test(n))return true;
+ const rows=matrix.filter(r=>r&&r.some(x=>x!==''));
+ if(!rows.length)return false;
+ const sample=rows.slice(0,Math.min(5,rows.length));
+ return sample.filter(r=>typeof r[0]==='string'&&cleanNumber(r[1])>0&&cleanNumber(r[2])>0).length>=Math.min(3,sample.length);
+}
+function importPosMatrix(matrix){
+ let imported=0,matched=0,created=0,unmatched=0;
+ const inRial=$('posPriceInRial')?.checked!==false;
+ const rows=matrix.filter(r=>r&&r.some(x=>x!==''));
+ rows.forEach((r,idx)=>{
+   const name=String(r[0]??'').trim(),qty=cleanNumber(r[1]),unitRaw=cleanNumber(r[2]),totalRaw=cleanNumber(r[3]);
+   if(!name||qty<=0){unmatched++;return}
+   let unitPrice=unitRaw;
+   if(!unitPrice&&totalRaw&&qty)unitPrice=totalRaw/qty;
+   if(inRial)unitPrice=unitPrice/10;
+   let rec=findRecipeForPos(name);
+   if(rec){matched++}
+   else{
+     rec={id:uid(),name,category:'خروجی پوز',cup:'',time:'',temp:'',allergens:'',price:unitPrice||0,salesQty:0,ingredients:[],steps:['رسپی این محصول هنوز وارد نشده است؛ فقط اطلاعات فروش از دستگاه پوز ثبت شده است.']};
+     db.recipes.push(rec);created++
+   }
+   rec.salesQty=qty;
+   if(unitPrice>0)rec.price=unitPrice;
+   rec.posSource=true;
+   rec.posTotal=inRial?totalRaw/10:totalRaw;
+   imported++
+ });
+ return{imported,matched,created,unmatched}
+}
 function detectSheetKind(name,row){const n=normHeader(name),heads=Object.keys(row).map(normHeader).join('|');if(/مواد|ingredient/.test(n)||/قیمتبسته.*مقداربسته/.test(heads))return'ingredients';if(/رسپی|recipe|دستور/.test(n)||/ناممحصول.*ماده.*مقدار/.test(heads))return'recipes';if(/فروش|sales/.test(n)||/ناممحصول.*تعدادفروش/.test(heads))return'sales';if(/هزینه|expense/.test(n)||/عنوانهزینه.*مبلغ/.test(heads))return'expenses';if(/موجودی|inventory|انبار/.test(n)||/نامماده.*موجودی/.test(heads))return'inventory';if(/پرت|ضایعات|waste/.test(n)||/نامماده.*مقدارپرت/.test(heads))return'wastes';return null}
 function maybeClear(kind){if(!$('excelReplace')?.checked)return;if(importExcelFiles.cleared?.has(kind))return;importExcelFiles.cleared=importExcelFiles.cleared||new Set();importExcelFiles.cleared.add(kind);if(kind==='ingredients'){db.ingredients=[];db.inventory={}}if(kind==='recipes'||kind==='sales')db.recipes=[];if(kind==='expenses')db.expenses=[];if(kind==='wastes')db.wastes=[]}
 function getOrCreateIngredient(name,unit='گرم'){if(!name)return null;let i=db.ingredients.find(x=>normHeader(x.name)===normHeader(name));if(!i){i={id:uid(),name:String(name).trim(),price:0,pack:1,unit:unit||'گرم'};db.ingredients.push(i);db.inventory[i.id]=0}return i}
