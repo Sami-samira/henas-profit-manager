@@ -27,12 +27,17 @@ db.employees=Array.isArray(db.employees)&&db.employees.length?db.employees:[
 db.attendance=Array.isArray(db.attendance)?db.attendance:[];
 db.correctionRequests=Array.isArray(db.correctionRequests)?db.correctionRequests:[];
 db.purchaseInvoices=Array.isArray(db.purchaseInvoices)?db.purchaseInvoices:[];
+db.clubCustomers=Array.isArray(db.clubCustomers)?db.clubCustomers:[];
+db.customerVisits=Array.isArray(db.customerVisits)?db.customerVisits:[];
+db.preorders=Array.isArray(db.preorders)?db.preorders:[];
+db.cafeStatus=db.cafeStatus||{status:"open",openTime:"08:00",prepMinutes:10,message:"باز هستیم و منتظرتان هستیم."};
+db.clubSettings=db.clubSettings||{pointsPer100k:10};
 db.appSecurity=db.appSecurity||{managerPin:"1403"};
 let activeRole=sessionStorage.getItem("henasRole")||"";
 let activeEmployeeId=Number(sessionStorage.getItem("henasEmployeeId")||0);
 let recipeDraft=[];
 let lastBotAnswer="";
-const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["purchases","خرید و انبار"],["staff","پرسنل"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
+const pages=[["dashboard","داشبورد"],["assistant","باریستا AI"],["recipes","رسپی‌ها"],["ingredients","مواد"],["operations","عملیات"],["club","باشگاه مشتریان"],["purchases","خرید و انبار"],["staff","پرسنل"],["accounts","حساب‌ها"],["import","ورود فایل"],["analysis","تحلیل"]];
 const $=id=>document.getElementById(id);
 function money(n){return Math.round(Number(n)||0).toLocaleString("fa-IR")+" تومان"}
 function num(n){return (Number(n)||0).toLocaleString("fa-IR",{maximumFractionDigits:1})}
@@ -217,11 +222,137 @@ function renderDashboard(m){
  const gap=db.settings.targetProfit-m.net,con=1-m.variableRate,extra=gap>0&&con>0?gap/con:0;$("extraSales").textContent=money(extra);$("extraDaily").textContent=money(extra/db.settings.workDays);
  const d=db.recipes.map(r=>({name:r.name,sales:r.price*r.salesQty,profit:(r.price-recipeCost(r))*r.salesQty}));renderChart("profitChart",d,"profit");renderChart("salesChart",d,"sales");
 }
-function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();renderPurchasesModule();fillRoleGate()}
+function renderAll(){const m=metrics();renderTables();renderRecipeRows();renderRecipeCards();renderChat();renderAnalysis(m);renderDashboard(m);renderAccountsModule();renderStaffModule();renderPurchasesModule();renderClubModule();fillRoleGate()}
 
 
 
 
+
+
+// ================= Henas Customer Club =================
+function normalizePhone(v){return String(v||'').replace(/\D/g,'').replace(/^98/,'0')}
+function clubCustomerStats(id){
+ const visits=db.customerVisits.filter(v=>v.customerId===id).sort((a,b)=>a.date.localeCompare(b.date));
+ const total=visits.reduce((s,v)=>s+(+v.amount||0),0),count=visits.length;
+ const last=visits.length?visits.at(-1).date:'';
+ const daysSince=last?Math.floor((new Date(localISODate())-new Date(last))/86400000):9999;
+ return{total,count,last,daysSince,avg:count?total/count:0}
+}
+function loyaltyLevel(c){
+ const s=clubCustomerStats(c.id),points=+c.points||0;
+ if(c.tag==='VIP'||s.total>=20000000||points>=2000)return{title:'VIP',cls:'level-vip'};
+ if(s.total>=10000000||points>=1000)return{title:'طلایی',cls:'level-gold'};
+ if(s.total>=4000000||points>=400)return{title:'نقره‌ای',cls:'level-silver'};
+ return{title:'برنزی',cls:'level-bronze'}
+}
+function saveClubCustomer(){
+ const id=+$('clubCustomerId').value,name=$('cName').value.trim(),phone=normalizePhone($('cPhone').value);
+ if(!name||phone.length<10)return alert('نام و شماره موبایل معتبر وارد کنید.');
+ const duplicate=db.clubCustomers.find(c=>normalizePhone(c.phone)===phone&&c.id!==id);
+ if(duplicate)return alert('این شماره قبلاً برای '+duplicate.name+' ثبت شده است.');
+ let c=id?db.clubCustomers.find(x=>x.id===id):null;
+ if(!c){c={id:uid(),createdAt:new Date().toISOString(),points:0};db.clubCustomers.push(c)}
+ Object.assign(c,{name,phone,birthday:$('cBirthday').value,instagram:$('cInstagram').value.trim(),favorite:$('cFavorite').value.trim(),preferredTime:$('cPreferredTime').value.trim(),points:+$('cPoints').value||0,tag:$('cTag').value,note:$('cNote').value.trim(),consent:$('cConsent').checked});
+ clearClubCustomerForm();save()
+}
+function clearClubCustomerForm(){
+ $('clubCustomerId').value='';
+ ['cName','cPhone','cBirthday','cInstagram','cFavorite','cPreferredTime','cNote'].forEach(id=>$(id).value='');
+ $('cPoints').value=0;$('cTag').value='عادی';$('cConsent').checked=true
+}
+function editClubCustomer(id){
+ const c=db.clubCustomers.find(x=>x.id===id);if(!c)return;
+ $('clubCustomerId').value=c.id;$('cName').value=c.name;$('cPhone').value=c.phone;$('cBirthday').value=c.birthday||'';$('cInstagram').value=c.instagram||'';$('cFavorite').value=c.favorite||'';$('cPreferredTime').value=c.preferredTime||'';$('cPoints').value=c.points||0;$('cTag').value=c.tag||'عادی';$('cNote').value=c.note||'';$('cConsent').checked=c.consent!==false;
+ $('cName').scrollIntoView({behavior:'smooth',block:'center'})
+}
+function deleteClubCustomer(id){
+ if(!confirm('مشتری و سوابق او حذف شود؟'))return;
+ db.clubCustomers=db.clubCustomers.filter(x=>x.id!==id);db.customerVisits=db.customerVisits.filter(x=>x.customerId!==id);db.preorders=db.preorders.filter(x=>x.customerId!==id);save()
+}
+function addCustomerVisit(){
+ const customerId=+$('visitCustomer').value,c=db.clubCustomers.find(x=>x.id===customerId),amount=cleanNumber($('visitAmount').value);
+ if(!c||amount<=0)return alert('مشتری و مبلغ خرید را وارد کنید.');
+ const autoPoints=Math.floor(amount/100000)*(db.clubSettings.pointsPer100k||10),bonus=+$('visitBonusPoints').value||0;
+ db.customerVisits.push({id:uid(),customerId,date:$('visitDate').value||localISODate(),amount,items:$('visitItems').value.trim(),channel:$('visitChannel').value,points:autoPoints+bonus,createdAt:new Date().toISOString()});
+ c.points=(+c.points||0)+autoPoints+bonus;
+ if($('visitItems').value.trim())c.favorite=c.favorite||$('visitItems').value.trim();
+ ['visitAmount','visitItems'].forEach(id=>$(id).value='');$('visitBonusPoints').value=0;save()
+}
+function setCafeStatus(status){db.cafeStatus.status=status;document.querySelectorAll('.cafe-status button').forEach(b=>b.classList.toggle('active',b.dataset.status===status))}
+function saveCafeStatus(){db.cafeStatus.openTime=$('cafeOpenTime').value;db.cafeStatus.prepMinutes=+$('cafePrepMinutes').value||10;db.cafeStatus.message=$('cafeStatusMessage').value.trim();save()}
+function cafeStatusText(){
+ const m={open:'🟢 کافه هناس باز است.',opening:'🟡 امروز کمی دیرتر باز می‌کنیم.',busy:'☕ کافه باز است و کمی شلوغیم.',closed:'🔴 کافه هناس فعلاً بسته است.'};
+ return `${m[db.cafeStatus.status]||m.open}\n${db.cafeStatus.openTime?'ساعت شروع: '+db.cafeStatus.openTime+'\n':''}${db.cafeStatus.message||''}\nزمان تقریبی آماده‌سازی سفارش: ${db.cafeStatus.prepMinutes||10} دقیقه.`
+}
+function copyText(text){navigator.clipboard?.writeText(text).then(()=>alert('متن کپی شد.')).catch(()=>prompt('متن را کپی کنید:',text))}
+function copyCafeStatus(){copyText(cafeStatusText())}
+function addPreorder(){
+ const customerId=+$('preCustomer').value,c=db.clubCustomers.find(x=>x.id===customerId),items=$('preItems').value.trim(),pickup=$('prePickupTime').value;
+ if(!c||!items||!pickup)return alert('مشتری، سفارش و زمان رسیدن را وارد کنید.');
+ db.preorders.push({id:uid(),customerId,customerName:c.name,phone:c.phone,items,pickupTime:pickup,amount:cleanNumber($('preAmount').value),payment:$('prePayment').value,note:$('preNote').value.trim(),status:'new',createdAt:new Date().toISOString()});
+ ['preItems','prePickupTime','preAmount','preNote'].forEach(id=>$(id).value='');save()
+}
+function updatePreorder(id,status){const p=db.preorders.find(x=>x.id===id);if(p){p.status=status;save()}}
+function deletePreorder(id){if(confirm('پیش‌سفارش حذف شود؟')){db.preorders=db.preorders.filter(x=>x.id!==id);save()}}
+function smsLink(phone,text){return `sms:${normalizePhone(phone)}?body=${encodeURIComponent(text)}`}
+function whatsappLink(phone,text){let p=normalizePhone(phone);if(p.startsWith('0'))p='98'+p.slice(1);return `https://wa.me/${p}?text=${encodeURIComponent(text)}`}
+function suggestCampaign(){
+ const goal=$('campaignGoal').value,offer=$('campaignOffer').value.trim()||'یک پیشنهاد ویژه هناس',disc=+$('campaignDiscount').value||10;
+ const texts={
+  inactive:`سلام دوست عزیز ☕ دلمان برایتان تنگ شده. این هفته با ارائه این پیام، ${disc}٪ تخفیف برای ${offer} مهمان هناس باشید.`,
+  holiday:`سلام ☕ امروز هم کنار شما هستیم. ${cafeStatusText()}\nمی‌توانید سفارشتان را زودتر ثبت کنید تا هنگام رسیدن آماده باشد.`,
+  birthday:`تولدت مبارک 🎉 امروز یک تجربه ویژه در کافه هناس برایت داریم. برای دریافت هدیه تولد، این پیام را نشان بده.`,
+  quiet:`امروز در ساعت‌های خلوت هناس، ${offer} با ${disc}٪ تخفیف منتظر شماست.`,
+  product:`یک پیشنهاد تازه از هناس ☕ ${offer}. برای اعضای باشگاه ${disc}٪ تخفیف ویژه در نظر گرفته‌ایم.`
+ };
+ $('campaignText').value=texts[goal]
+}
+function campaignAudienceList(){
+ const goal=$('campaignGoal').value,days=+$('campaignInactiveDays').value||30,today=localISODate(),monthDay=today.slice(5);
+ return db.clubCustomers.filter(c=>{
+  if(c.consent===false)return false;
+  const s=clubCustomerStats(c.id);
+  if(goal==='inactive')return s.daysSince>=days;
+  if(goal==='birthday')return c.birthday&&c.birthday.slice(5)===monthDay;
+  return true
+ })
+}
+function buildCampaignAudience(){
+ suggestCampaign();
+ const list=campaignAudienceList(),text=$('campaignText').value;
+ $('campaignAudience').innerHTML=list.length?`<div class="summary-strip"><span class="chip good">${num(list.length)} مخاطب مناسب</span></div>`+list.map(c=>`<div class="campaign-card"><strong>${esc(c.name)}</strong> | ${esc(c.phone)}<div class="customer-actions"><a class="btn" href="${smsLink(c.phone,text)}">SMS</a><a class="btn good" target="_blank" href="${whatsappLink(c.phone,text)}">WhatsApp</a></div></div>`).join(''):'<div class="empty">مخاطبی مطابق این کمپین پیدا نشد.</div>'
+}
+function copyCampaignText(){copyText($('campaignText').value)}
+function exportClubExcel(){
+ if(typeof XLSX==='undefined')return alert('کتابخانه Excel بارگذاری نشده است.');
+ const customers=db.clubCustomers.map(c=>{const s=clubCustomerStats(c.id),l=loyaltyLevel(c);return {'نام':c.name,'موبایل':c.phone,'تولد':c.birthday,'برچسب':c.tag,'سطح':l.title,'امتیاز':c.points,'تعداد خرید':s.count,'جمع خرید':s.total,'میانگین خرید':s.avg,'آخرین مراجعه':s.last,'روز از آخرین مراجعه':s.daysSince,'محبوب':c.favorite,'رضایت پیام':c.consent?'بله':'خیر'}});
+ const visits=db.customerVisits.map(v=>{const c=db.clubCustomers.find(x=>x.id===v.customerId);return {'تاریخ':v.date,'مشتری':c?.name,'موبایل':c?.phone,'مبلغ':v.amount,'سفارش':v.items,'کانال':v.channel,'امتیاز':v.points}});
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(customers),'مشتریان');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(visits),'خریدها');XLSX.writeFile(wb,'باشگاه_مشتریان_هناس.xlsx')
+}
+function renderClubModule(){
+ if(!$('clubMembersKpi'))return;
+ if(!$('visitDate').value)$('visitDate').value=localISODate();
+ $('cafeOpenTime').value=db.cafeStatus.openTime||'';$('cafePrepMinutes').value=db.cafeStatus.prepMinutes||10;$('cafeStatusMessage').value=db.cafeStatus.message||'';
+ setCafeStatus(db.cafeStatus.status);
+ $('cafePublicStatus').innerHTML='<h4>وضعیت قابل انتشار</h4><p>'+esc(cafeStatusText())+'</p>';
+ const options=db.clubCustomers.map(c=>`<option value="${c.id}">${esc(c.name)} | ${esc(c.phone)}</option>`).join('');
+ $('visitCustomer').innerHTML=options;$('preCustomer').innerHTML=options;
+ const q=normHeader($('clubSearch').value||'');
+ const customers=db.clubCustomers.filter(c=>!q||[c.name,c.phone,c.favorite,c.tag,c.note].some(v=>normHeader(v).includes(q)));
+ $('clubCustomerCards').innerHTML=customers.length?customers.map(c=>{const s=clubCustomerStats(c.id),l=loyaltyLevel(c);return `<div class="club-card"><div class="club-card-head"><div><strong>${esc(c.name)}</strong><div class="customer-meta">${esc(c.phone)} | ${esc(c.favorite||'علاقه ثبت نشده')}</div></div><span class="chip ${l.cls}">${l.title}</span></div><div class="summary-strip"><span class="chip">امتیاز ${num(c.points||0)}</span><span class="chip">خرید ${num(s.count)}</span><span class="chip good">${money(s.total)}</span><span class="chip ${s.daysSince>=30?'bad':'good'}">${s.last?'آخرین '+num(s.daysSince)+' روز قبل':'بدون خرید'}</span></div><div class="customer-actions"><button class="btn" onclick="editClubCustomer(${c.id})">ویرایش</button><a class="btn" href="${smsLink(c.phone,'سلام '+c.name+'، از کافه هناس پیام می‌دهیم ☕')}">پیامک</a><a class="btn good" target="_blank" href="${whatsappLink(c.phone,'سلام '+c.name+'، از کافه هناس پیام می‌دهیم ☕')}">واتساپ</a><button class="btn danger" onclick="deleteClubCustomer(${c.id})">حذف</button></div></div>`}).join(''):'<div class="empty">مشتری ثبت نشده است.</div>';
+ const active=db.clubCustomers.filter(c=>clubCustomerStats(c.id).daysSince<=30).length,inactive=db.clubCustomers.filter(c=>{const d=clubCustomerStats(c.id).daysSince;return d>=30&&d<9999}).length;
+ $('clubMembersKpi').textContent=num(db.clubCustomers.length);$('activeCustomersKpi').textContent=num(active);$('inactiveCustomersKpi').textContent=num(inactive);$('openPreordersKpi').textContent=num(db.preorders.filter(p=>!['delivered','cancelled'].includes(p.status)).length);
+ $('preorderList').innerHTML=db.preorders.length?db.preorders.slice().sort((a,b)=>a.pickupTime.localeCompare(b.pickupTime)).map(p=>`<div class="preorder-card"><div class="club-card-head"><div><strong>${esc(p.customerName)}</strong><div class="customer-meta">${esc(p.pickupTime.replace('T',' '))} | ${esc(p.phone)}</div></div><span class="chip ${p.status==='delivered'?'good':p.status==='cancelled'?'bad':'warn'}">${p.status==='new'?'جدید':p.status==='preparing'?'در حال آماده‌سازی':p.status==='ready'?'آماده':p.status==='delivered'?'تحویل شد':'لغو'}</span></div><p>${esc(p.items)} | ${money(p.amount||0)} | ${esc(p.payment)}</p><div class="customer-actions"><button class="btn" onclick="updatePreorder(${p.id},'preparing')">آماده‌سازی</button><button class="btn good" onclick="updatePreorder(${p.id},'ready')">آماده شد</button><button class="btn" onclick="updatePreorder(${p.id},'delivered')">تحویل</button><button class="btn danger" onclick="deletePreorder(${p.id})">حذف</button></div></div>`).join(''):'<div class="empty">پیش‌سفارشی ثبت نشده است.</div>';
+ const insights=[];
+ if(inactive)insights.push({level:'high',title:`${inactive} مشتری در معرض ریزش`,text:'برای مشتریانی که بیش از ۳۰ روز مراجعه نکرده‌اند، یک پیشنهاد کوچک و شخصی‌سازی‌شده ارسال کنید.',impact:'کمپین بازگشت مشتری'});
+ const birthdays=db.clubCustomers.filter(c=>c.birthday&&c.birthday.slice(5)===localISODate().slice(5)).length;if(birthdays)insights.push({level:'low',title:`امروز تولد ${birthdays} عضو است`,text:'پیام تبریک و هدیه کم‌هزینه اما به‌یادماندنی ارسال کنید.',impact:'وفادارسازی'});
+ const noFav=db.clubCustomers.filter(c=>!c.favorite).length;if(noFav)insights.push({level:'medium',title:`علاقه‌مندی ${noFav} مشتری ثبت نشده`,text:'در مراجعه بعدی نوشیدنی محبوب را ثبت کنید تا کمپین‌ها هدفمندتر شوند.',impact:'بهبود شخصی‌سازی'});
+ const top=[...db.clubCustomers].sort((a,b)=>clubCustomerStats(b.id).total-clubCustomerStats(a.id).total).slice(0,3);if(top.length)insights.push({level:'low',title:'مشتریان باارزش',text:top.map(c=>c.name).join('، ')+' بیشترین ارزش خرید را دارند. برای آن‌ها تجربه VIP و پیش‌سفارش سریع فعال کنید.',impact:'حفظ مشتریان کلیدی'});
+ insights.push({level:'medium',title:'ایده خلاقانه: سفارش همیشگی',text:'برای مشتری ثابت یک دکمه «همان سفارش همیشگی» بسازید تا با یک لمس زمان رسیدن را اعلام کند.',impact:'سرعت و تجربه بهتر'});
+ insights.push({level:'medium',title:'ایده خلاقانه: ساعت خلوت',text:'در ساعاتی که فروش پایین است، فقط برای مشتریانی که معمولاً همان حوالی مراجعه می‌کنند پیشنهاد محدود بفرستید.',impact:'فروش بدون تخفیف عمومی'});
+ $('clubInsights').innerHTML=insights.map(x=>`<div class="insight ${x.level}"><h4>${esc(x.title)}</h4><p>${x.text}</p><p class="impact">${x.impact}</p></div>`).join('');
+ if(!$('campaignText').value)suggestCampaign()
+}
 
 // ================= Purchase & Weighted Average =================
 function basePurchaseQty(qty,unit){

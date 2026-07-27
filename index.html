@@ -112,6 +112,21 @@
 .purchase-kpi{background:#151515;border:1px solid #393939;border-radius:16px;padding:14px}
 .purchase-kpi small{color:#aaa}.purchase-kpi strong{display:block;font-size:22px;margin-top:7px}
 @media(max-width:850px){.purchase-kpis{grid-template-columns:1fr 1fr}}
+
+.club-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:13px}
+.club-kpi{background:#151515;border:1px solid #393939;border-radius:16px;padding:14px}
+.club-kpi small{color:#aaa}.club-kpi strong{display:block;font-size:22px;margin-top:7px}
+.club-card{background:#141414;border:1px solid #373737;border-radius:16px;padding:14px;margin-bottom:10px}
+.club-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.level-bronze{background:#49372d}.level-silver{background:#414141}.level-gold{background:#5a4823}.level-vip{background:#3c2c51}
+.cafe-status{display:flex;gap:8px;flex-wrap:wrap}.cafe-status button.active{outline:2px solid #aaa}
+.customer-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.campaign-card{background:#131313;border:1px solid #363636;border-right:4px solid #7d93a8;border-radius:14px;padding:13px;margin-bottom:9px}
+.preorder-card{background:#141414;border:1px solid #3a3a3a;border-radius:14px;padding:13px;margin-bottom:9px}
+.customer-score{font-size:24px;font-weight:900}
+.consent-note{font-size:11px;color:#999;line-height:1.8}
+@media(max-width:850px){.club-kpis{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body>
@@ -284,6 +299,127 @@
 
 
 
+
+
+<section class="page" data-page="club">
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <h2>Henas Club | باشگاه تجربه مشتریان</h2>
+        <p>مشتریان را بشناسید، ارتباط شخصی‌سازی‌شده بسازید، روزهای خلوت را پُر کنید و سفارش مشتریان ثابت را قبل از رسیدن آماده کنید.</p>
+      </div>
+      <div class="hero-orb">❤</div>
+    </div>
+  </div>
+
+  <div class="club-kpis">
+    <div class="club-kpi"><small>اعضای باشگاه</small><strong id="clubMembersKpi">۰</strong></div>
+    <div class="club-kpi"><small>مشتریان فعال ۳۰ روزه</small><strong id="activeCustomersKpi">۰</strong></div>
+    <div class="club-kpi"><small>مشتریان نیازمند بازگشت</small><strong id="inactiveCustomersKpi">۰</strong></div>
+    <div class="club-kpi"><small>پیش‌سفارش‌های باز</small><strong id="openPreordersKpi">۰</strong></div>
+  </div>
+
+  <div class="grid">
+    <div class="card span5">
+      <h2>ثبت یا ویرایش مشتری</h2>
+      <input id="clubCustomerId" type="hidden">
+      <div class="form two">
+        <div><label>نام و نام خانوادگی</label><input id="cName"></div>
+        <div><label>شماره موبایل</label><input id="cPhone" inputmode="tel" placeholder="09xxxxxxxxx"></div>
+        <div><label>تاریخ تولد</label><input id="cBirthday" type="date"></div>
+        <div><label>اینستاگرام</label><input id="cInstagram" placeholder="@username"></div>
+        <div><label>نوشیدنی محبوب</label><input id="cFavorite" placeholder="اسپرسو فول"></div>
+        <div><label>زمان مراجعه محبوب</label><input id="cPreferredTime" placeholder="جمعه صبح / شب‌ها"></div>
+        <div><label>امتیاز اولیه</label><input id="cPoints" type="number" value="0"></div>
+        <div><label>برچسب</label><select id="cTag"><option>عادی</option><option>ثابت</option><option>ورزشکار</option><option>خانوادگی</option><option>دانشجو</option><option>VIP</option></select></div>
+      </div>
+      <div><label>یادداشت تجربه مشتری</label><textarea id="cNote" placeholder="حساسیت، ترجیحات، نحوه سرو یا نکات ارتباطی"></textarea></div>
+      <label class="checkline"><input id="cConsent" type="checkbox" checked> رضایت برای دریافت پیام‌های باشگاه ثبت شده است</label>
+      <div class="consent-note">برای ارسال پیام تبلیغاتی، رضایت مشتری و امکان لغو عضویت باید رعایت شود.</div>
+      <div class="actions">
+        <button class="btn good" onclick="saveClubCustomer()">ذخیره مشتری</button>
+        <button class="btn" onclick="clearClubCustomerForm()">فرم جدید</button>
+      </div>
+    </div>
+
+    <div class="card span7">
+      <div class="section-title">
+        <h2>اعضای باشگاه</h2>
+        <input id="clubSearch" placeholder="نام، شماره، علاقه یا برچسب..." oninput="renderClubModule()" style="max-width:280px">
+      </div>
+      <div id="clubCustomerCards"></div>
+    </div>
+
+    <div class="card span6">
+      <h2>ثبت خرید و امتیاز</h2>
+      <div class="form two">
+        <div><label>مشتری</label><select id="visitCustomer"></select></div>
+        <div><label>مبلغ خرید</label><input id="visitAmount" type="number"></div>
+        <div><label>تاریخ</label><input id="visitDate" type="date"></div>
+        <div><label>سفارش</label><input id="visitItems" placeholder="لاته + چیزکیک"></div>
+        <div><label>امتیاز دستی اضافه</label><input id="visitBonusPoints" type="number" value="0"></div>
+        <div><label>کانال خرید</label><select id="visitChannel"><option>حضوری</option><option>پیش‌سفارش</option><option>تلفنی</option><option>ارسال</option></select></div>
+      </div>
+      <div class="actions"><button class="btn good" onclick="addCustomerVisit()">ثبت خرید</button></div>
+      <div class="consent-note">قاعده فعلی: به ازای هر ۱۰۰٬۰۰۰ تومان خرید، ۱۰ امتیاز. از تنظیمات کمپین قابل تغییر است.</div>
+    </div>
+
+    <div class="card span6">
+      <h2>وضعیت امروز کافه</h2>
+      <div class="cafe-status">
+        <button class="btn" data-status="open" onclick="setCafeStatus('open')">🟢 باز هستیم</button>
+        <button class="btn" data-status="opening" onclick="setCafeStatus('opening')">🟡 دیرتر باز می‌کنیم</button>
+        <button class="btn" data-status="busy" onclick="setCafeStatus('busy')">☕ شلوغ</button>
+        <button class="btn" data-status="closed" onclick="setCafeStatus('closed')">🔴 بسته</button>
+      </div>
+      <div class="form two" style="margin-top:12px">
+        <div><label>ساعت شروع امروز</label><input id="cafeOpenTime" type="time"></div>
+        <div><label>زمان تقریبی آماده‌سازی</label><input id="cafePrepMinutes" type="number" value="10"></div>
+      </div>
+      <div><label>پیام وضعیت</label><textarea id="cafeStatusMessage" placeholder="امروز از ساعت ۱۰ کنار شما هستیم."></textarea></div>
+      <div class="actions"><button class="btn good" onclick="saveCafeStatus()">انتشار وضعیت</button><button class="btn" onclick="copyCafeStatus()">کپی متن برای استوری/پیام</button></div>
+      <div id="cafePublicStatus" class="insight low" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card span6">
+      <h2>ثبت پیش‌سفارش</h2>
+      <div class="form two">
+        <div><label>مشتری</label><select id="preCustomer"></select></div>
+        <div><label>سفارش</label><input id="preItems" placeholder="اسپرسو فول + کوکی"></div>
+        <div><label>زمان رسیدن</label><input id="prePickupTime" type="datetime-local"></div>
+        <div><label>مبلغ تقریبی</label><input id="preAmount" type="number"></div>
+        <div><label>وضعیت پرداخت</label><select id="prePayment"><option>پرداخت هنگام تحویل</option><option>کارت به کارت</option><option>پرداخت شده</option></select></div>
+        <div><label>یادداشت</label><input id="preNote"></div>
+      </div>
+      <div class="actions"><button class="btn good" onclick="addPreorder()">ثبت پیش‌سفارش</button></div>
+      <div id="preorderList" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card span6">
+      <div class="section-title"><h2>کمپین و پیام هوشمند</h2><button class="btn" onclick="exportClubExcel()">خروجی Excel</button></div>
+      <div class="form two">
+        <div><label>هدف کمپین</label><select id="campaignGoal" onchange="suggestCampaign()">
+          <option value="inactive">بازگرداندن مشتریان غیرفعال</option>
+          <option value="holiday">اعلام بازبودن روز تعطیل</option>
+          <option value="birthday">تبریک تولد</option>
+          <option value="quiet">افزایش فروش ساعات خلوت</option>
+          <option value="product">معرفی محصول یا کمبو</option>
+        </select></div>
+        <div><label>محصول/پیشنهاد</label><input id="campaignOffer" placeholder="لاته + کوکی"></div>
+        <div><label>حداقل روز عدم مراجعه</label><input id="campaignInactiveDays" type="number" value="30"></div>
+        <div><label>درصد تخفیف</label><input id="campaignDiscount" type="number" value="10"></div>
+      </div>
+      <div><label>متن پیشنهادی</label><textarea id="campaignText"></textarea></div>
+      <div class="actions"><button class="btn good" onclick="buildCampaignAudience()">ساخت لیست مخاطبان</button><button class="btn" onclick="copyCampaignText()">کپی متن</button></div>
+      <div id="campaignAudience"></div>
+    </div>
+
+    <div class="card span12">
+      <h2>پیشنهادهای رشد باشگاه مشتریان</h2>
+      <div id="clubInsights"></div>
+    </div>
+  </div>
+</section>
 
 <section class="page" data-page="purchases">
   <div class="hero"><div class="hero-top"><div><h2>خرید و میانگین موزون موجودی</h2><p>هر فاکتور خرید را جداگانه ثبت کنید تا قیمت واقعی مواد و بهای تمام‌شده رسپی‌ها درست محاسبه شود.</p></div><div class="hero-orb">📦</div></div></div>
